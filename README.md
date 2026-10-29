@@ -67,7 +67,8 @@ docs/             HERMES_MAC_MINI_SETUP.md: install Hermes on a Mac mini and con
 ## Deploy
 
 Build (`npm run build`) and serve `dist/` from the same origin as agent-api. agent-api's `deploy/Caddyfile` does
-this on a Mac mini. Full walkthrough: [docs/HERMES_MAC_MINI_SETUP.md](docs/HERMES_MAC_MINI_SETUP.md).
+this on a Mac mini. Full walkthrough: [docs/HERMES_MAC_MINI_SETUP.md](docs/HERMES_MAC_MINI_SETUP.md)
+(or open `docs/HERMES_MAC_MINI_SETUP.html` in a browser).
 
 ## License
 
