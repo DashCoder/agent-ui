@@ -12,6 +12,11 @@ export interface AvatarConfig {
   speakReplies: boolean;
   /** Microsoft Edge neural voice, e.g. en-GB-RyanNeural. */
   voice?: string;
+  /** Admin switch and face for the optional live Simli avatar. */
+  simliEnabled?: boolean;
+  simliFaceId?: string;
+  /** Set by the server: true when Simli is configured, so visitors may switch it on. */
+  simliAvailable?: boolean;
 }
 
 /** Full settings document (admin only) — SiteConfig plus private sections. */

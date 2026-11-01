@@ -1,6 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AvatarConfig } from '../api/types';
+import { load, store } from '../lib/storage';
 import { ExpandIcon, PauseIcon, PlayIcon } from './Icons';
+import { SimliStage, type AudioSink } from './SimliStage';
+
+export type AvatarMode = 'video' | 'live';
+const MODE_KEY = 'agent-ui.avatarMode';
 
 interface Props {
   avatar: AvatarConfig;
@@ -8,22 +13,28 @@ interface Props {
   talking: boolean;
   /** Called when the visitor turns voice + motion on/off with the play button. */
   onPlayingChange?: (playing: boolean) => void;
+  /** Receives the live avatar's audio input while it is connected (null otherwise). */
+  onSink?: (sink: AudioSink | null) => void;
   compact?: boolean;
 }
 
 /**
- * Video avatar with idle/talking loops (same idea as the offline "video loop" fallback):
- *  - idleVideos play while listening, talkVideos while the assistant replies
- *  - with no videos configured, the poster image is shown with a subtle breathing motion
- * Replace this component to use Simli, MuseTalk or another live avatar.
+ * The assistant's face, shown in a circle on a soft gradient.
+ *  - Video mode: idleVideos loop while listening, talkVideos while replying (poster image if none).
+ *  - Live mode (optional): a Simli lip-synced avatar, when the admin has switched it on.
+ * The visitor's choice is remembered in this browser.
  */
-export function AvatarPanel({ avatar, talking, onPlayingChange, compact }: Props) {
+export function AvatarPanel({ avatar, talking, onPlayingChange, onSink, compact }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const idleRef = useRef<HTMLVideoElement>(null);
   const talkRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [idleIdx, setIdleIdx] = useState(0);
   const [talkIdx, setTalkIdx] = useState(0);
+  const [mode, setMode] = useState<AvatarMode>(() => load<AvatarMode>(MODE_KEY, 'video'));
+  const [notice, setNotice] = useState<string | null>(null);
+  const canLive = !compact && !!avatar.simliAvailable;
+  const live = canLive && mode === 'live';
   const hasVideo = avatar.idleVideos.length > 0;
   const hasTalk = avatar.talkVideos.length > 0;
   const showTalk = playing && talking && hasTalk;
@@ -39,13 +50,26 @@ export function AvatarPanel({ avatar, talking, onPlayingChange, compact }: Props
       if (playing) void v.play().catch(() => {});
       else v.pause();
     }
-  }, [playing, idleIdx, talkIdx, showTalk]);
+  }, [playing, idleIdx, talkIdx, showTalk, live]);
 
   const toggle = () => {
     const next = !playing;
     setPlaying(next);
     onPlayingChange?.(next);
   };
+
+  const switchMode = () => {
+    const next: AvatarMode = mode === 'live' ? 'video' : 'live';
+    setMode(next);
+    store(MODE_KEY, next);
+    setNotice(null);
+  };
+
+  const handleSink = useCallback((sink: AudioSink | null) => onSink?.(sink), [onSink]);
+  const handleLiveError = useCallback((message: string) => {
+    setNotice(`Live avatar unavailable (${message}). Showing video instead.`);
+    setMode('video');
+  }, []);
 
   const fullscreen = () => {
     const el = wrapRef.current;
@@ -57,19 +81,29 @@ export function AvatarPanel({ avatar, talking, onPlayingChange, compact }: Props
   return (
     <div ref={wrapRef} className={`avatar ${compact ? 'avatar--compact' : ''} ${talking ? 'is-talking' : ''}`}
          data-testid="avatar">
-      {hasVideo ? (
-        <>
-          <video ref={idleRef} className="avatar__media" src={avatar.idleVideos[idleIdx]} poster={avatar.posterUrl}
-                 muted playsInline loop={avatar.idleVideos.length === 1}
-                 onEnded={() => setIdleIdx((i) => (i + 1) % avatar.idleVideos.length)} />
-          {hasTalk && (
-            <video ref={talkRef} className={`avatar__media avatar__talk ${showTalk ? 'is-visible' : ''}`}
-                   src={avatar.talkVideos[talkIdx]} muted playsInline loop />
-          )}
-        </>
-      ) : (
-        <img className={`avatar__media ${playing ? 'avatar__breathe' : ''}`} src={avatar.posterUrl} alt="" />
+      <div className="avatar__circle">
+        {hasVideo ? (
+          <>
+            <video ref={idleRef} className="avatar__media" src={avatar.idleVideos[idleIdx]} poster={avatar.posterUrl}
+                   muted playsInline loop={avatar.idleVideos.length === 1}
+                   onEnded={() => setIdleIdx((i) => (i + 1) % avatar.idleVideos.length)} />
+            {hasTalk && (
+              <video ref={talkRef} className={`avatar__media avatar__talk ${showTalk ? 'is-visible' : ''}`}
+                     src={avatar.talkVideos[talkIdx]} muted playsInline loop />
+            )}
+          </>
+        ) : (
+          <img className={`avatar__media ${playing ? 'avatar__breathe' : ''}`} src={avatar.posterUrl} alt="" />
+        )}
+        {live && <SimliStage active={playing} onSink={handleSink} onError={handleLiveError} />}
+      </div>
+      {canLive && (
+        <button type="button" className={`avatar__mode ${live ? 'is-on' : ''}`} onClick={switchMode}
+                aria-pressed={live} title="Switch between the recorded video and a live lip-synced avatar">
+          <span className="avatar__mode-dot" aria-hidden="true" /> Live avatar
+        </button>
       )}
+      {notice && <span className="avatar__status avatar__status--warn" role="status">{notice}</span>}
       <button type="button" className="avatar__btn avatar__btn--play" onClick={toggle}
               aria-label={playing ? 'Pause avatar and voice' : 'Play avatar and voice'} aria-pressed={playing}>
         {playing ? <PauseIcon /> : <PlayIcon />}

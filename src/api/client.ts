@@ -100,6 +100,8 @@ export const api = {
   deleteKnowledge: (id: string) => request<{ ok: true }>(`/api/admin/knowledge/${id}`, { method: 'DELETE' }),
   hermes: () => request<HermesInfo>('/api/admin/hermes'),
 
+  simliToken: () => request<{ sessionToken: string; maxSessionSeconds: number }>('/api/simli/token', { method: 'POST' }),
+
   /** Natural voice (MP3) from agent-api. Returns null when there is nothing to say. */
   async tts(text: string, voice?: string): Promise<Blob | null> {
     const res = await fetch(BASE + '/api/tts', {

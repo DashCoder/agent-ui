@@ -6,6 +6,7 @@ import { useSiteConfig } from '../hooks/useSiteConfig';
 import { useSpeech } from '../hooks/useSpeech';
 import { ApprovalCard } from './ApprovalCard';
 import { AvatarPanel } from './AvatarPanel';
+import type { AudioSink } from './SimliStage';
 import { Composer } from './Composer';
 import { ChevronDownIcon, ChevronUpIcon } from './Icons';
 import { MessageBubble } from './MessageBubble';
@@ -21,7 +22,9 @@ interface Props {
 export function ChatExperience({ savedPlacement = 'aside' }: Props) {
   const { config, loaded } = useSiteConfig();
   const chat = useChat(loaded);
-  const speech = useSpeech(config.avatar.voice);
+  const sinkRef = useRef<AudioSink | null>(null);
+  const speech = useSpeech(config.avatar.voice, sinkRef);
+  const onSink = useCallback((sink: AudioSink | null) => { sinkRef.current = sink; }, []);
   const [saved, setSaved] = useState<SavedReply[]>([]);
   const [learn, setLearn] = useState(config.assistant.learnByDefault);
   const [avatarOpen, setAvatarOpen] = useState(true);
@@ -87,7 +90,7 @@ export function ChatExperience({ savedPlacement = 'aside' }: Props) {
     <div className={`chat-layout chat-layout--${savedPlacement}`}>
       <div className="chat-main">
         {avatarOpen && (
-          <AvatarPanel avatar={config.avatar} talking={talking} onPlayingChange={onPlayingChange} />
+          <AvatarPanel avatar={config.avatar} talking={talking} onPlayingChange={onPlayingChange} onSink={onSink} />
         )}
 
         <div className="transcript-card">

@@ -20,7 +20,8 @@ export const VOICES: { id: string; label: string }[] = [
 
 export function AvatarSettings() {
   const { settings, save, status, error } = useSettings();
-  const [form, setForm] = useState({ posterUrl: '', idle: '', talk: '', speakReplies: false, voice: 'en-GB-RyanNeural' });
+  const [form, setForm] = useState({ posterUrl: '', idle: '', talk: '', speakReplies: false, voice: 'en-GB-RyanNeural',
+    simliEnabled: false, simliFaceId: '' });
   const speech = useSpeech(form.voice);
   const [previewTalking, setPreviewTalking] = useState(false);
 
@@ -28,12 +29,14 @@ export function AvatarSettings() {
     if (!settings) return;
     const a = settings.avatar;
     setForm({ posterUrl: a.posterUrl, idle: a.idleVideos.join('\n'), talk: a.talkVideos.join('\n'),
-              speakReplies: a.speakReplies, voice: a.voice || 'en-GB-RyanNeural' });
+              speakReplies: a.speakReplies, voice: a.voice || 'en-GB-RyanNeural',
+              simliEnabled: !!a.simliEnabled, simliFaceId: a.simliFaceId ?? '' });
   }, [settings]);
 
   const preview: AvatarConfig = { posterUrl: form.posterUrl, idleVideos: lines(form.idle),
                                   talkVideos: lines(form.talk), speakReplies: form.speakReplies,
-                                  voice: form.voice };
+                                  voice: form.voice, simliEnabled: form.simliEnabled,
+                                  simliFaceId: form.simliFaceId.trim() };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -71,6 +74,20 @@ export function AvatarSettings() {
             `Hi, I'm ${settings?.assistant.name ?? 'your assistant'}. This is how I sound when I read replies aloud.`)}>
             {speech.speaking ? 'Playing…' : '▶ Test voice'}
           </button>
+          <fieldset className="field">
+            <span>Live avatar (Simli, optional)</span>
+            <label className="check">
+              <input type="checkbox" checked={form.simliEnabled}
+                     onChange={(e) => setForm({ ...form, simliEnabled: e.target.checked })} />
+              Let visitors switch on a live lip-synced avatar
+            </label>
+            <label className="field"><span>Simli face ID</span>
+              <input value={form.simliFaceId} placeholder="e.g. a face ID from app.simli.com"
+                     onChange={(e) => setForm({ ...form, simliFaceId: e.target.value })} />
+            </label>
+            <span className="muted small">Also needs <code>SIMLI_API_KEY</code> in agent-api's <code>.env</code>.
+              Sessions are capped per day (<code>SIMLI_DAILY_SESSIONS</code>) to control cost.</span>
+          </fieldset>
           <p className="muted small">Tip: put clips in <code>public/avatar/</code> or any HTTPS URL. Make them with
             <code> prepare_clips.py</code> so they loop seamlessly.</p>
           <FormFooter status={status} error={error} />
