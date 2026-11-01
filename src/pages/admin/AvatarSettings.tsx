@@ -1,23 +1,39 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { AvatarConfig } from '../../api/types';
 import { AvatarPanel } from '../../components/AvatarPanel';
+import { useSpeech } from '../../hooks/useSpeech';
 import { PageHeader } from './AdminLayout';
 import { lines, useSettings } from './useSettings';
 
+/** Microsoft Edge neural voices (free). Any other "xx-XX-NameNeural" voice also works. */
+export const VOICES: { id: string; label: string }[] = [
+  { id: 'en-GB-RyanNeural', label: 'Ryan – British, male' },
+  { id: 'en-GB-ThomasNeural', label: 'Thomas – British, male' },
+  { id: 'en-GB-SoniaNeural', label: 'Sonia – British, female' },
+  { id: 'en-GB-LibbyNeural', label: 'Libby – British, female' },
+  { id: 'en-US-AndrewNeural', label: 'Andrew – American, male' },
+  { id: 'en-US-AvaNeural', label: 'Ava – American, female' },
+  { id: 'en-IE-ConnorNeural', label: 'Connor – Irish, male' },
+  { id: 'sv-SE-MattiasNeural', label: 'Mattias – Swedish, male' },
+  { id: 'sv-SE-SofieNeural', label: 'Sofie – Swedish, female' },
+];
+
 export function AvatarSettings() {
   const { settings, save, status, error } = useSettings();
-  const [form, setForm] = useState({ posterUrl: '', idle: '', talk: '', speakReplies: false });
+  const [form, setForm] = useState({ posterUrl: '', idle: '', talk: '', speakReplies: false, voice: 'en-GB-RyanNeural' });
+  const speech = useSpeech(form.voice);
   const [previewTalking, setPreviewTalking] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
     const a = settings.avatar;
     setForm({ posterUrl: a.posterUrl, idle: a.idleVideos.join('\n'), talk: a.talkVideos.join('\n'),
-              speakReplies: a.speakReplies });
+              speakReplies: a.speakReplies, voice: a.voice || 'en-GB-RyanNeural' });
   }, [settings]);
 
   const preview: AvatarConfig = { posterUrl: form.posterUrl, idleVideos: lines(form.idle),
-                                  talkVideos: lines(form.talk), speakReplies: form.speakReplies };
+                                  talkVideos: lines(form.talk), speakReplies: form.speakReplies,
+                                  voice: form.voice };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -45,6 +61,16 @@ export function AvatarSettings() {
                    onChange={(e) => setForm({ ...form, speakReplies: e.target.checked })} />
             Read replies aloud when the visitor presses play
           </label>
+          <label className="field"><span>Voice</span>
+            <select value={form.voice} onChange={(e) => setForm({ ...form, voice: e.target.value })}>
+              {!VOICES.some((v) => v.id === form.voice) && <option value={form.voice}>{form.voice}</option>}
+              {VOICES.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+            </select>
+          </label>
+          <button type="button" className="btn" onClick={() => void speech.speak(
+            `Hi, I'm ${settings?.assistant.name ?? 'your assistant'}. This is how I sound when I read replies aloud.`)}>
+            {speech.speaking ? 'Playing…' : '▶ Test voice'}
+          </button>
           <p className="muted small">Tip: put clips in <code>public/avatar/</code> or any HTTPS URL. Make them with
             <code> prepare_clips.py</code> so they loop seamlessly.</p>
           <FormFooter status={status} error={error} />

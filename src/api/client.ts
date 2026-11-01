@@ -99,4 +99,15 @@ export const api = {
     request<KnowledgeItem>('/api/admin/knowledge', { method: 'POST', body: json({ kind, value }) }),
   deleteKnowledge: (id: string) => request<{ ok: true }>(`/api/admin/knowledge/${id}`, { method: 'DELETE' }),
   hermes: () => request<HermesInfo>('/api/admin/hermes'),
+
+  /** Natural voice (MP3) from agent-api. Returns null when there is nothing to say. */
+  async tts(text: string, voice?: string): Promise<Blob | null> {
+    const res = await fetch(BASE + '/api/tts', {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      body: json({ text, voice }),
+    });
+    if (res.status === 204) return null;
+    if (!res.ok) throw new ApiError(res.status, res.statusText);
+    return res.blob();
+  },
 };
