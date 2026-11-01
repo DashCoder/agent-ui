@@ -123,3 +123,19 @@ test('every avatar clip is preloaded once, so switching clips never reloads a vi
   await expect(page.getByTestId('avatar').locator('video.avatar__clip.is-visible')).toHaveCount(1);
   await expect(clips.first()).toHaveAttribute('preload', 'auto');
 });
+
+test('links show as short labels and agent files become downloads', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/');
+  await page.getByPlaceholder(/Ask/).fill('make a mascot');
+  await page.getByRole('button', { name: 'Send' }).click();
+  const reply = page.getByTestId('msg-assistant').nth(1);
+  const site = reply.getByRole('link', { name: 'Go to github.com' });
+  await expect(site).toHaveAttribute('title', 'https://github.com/inagentic/agent-ui');
+  const dl = reply.getByRole('link', { name: 'Download image' });
+  await expect(dl).toHaveAttribute('href', /\/api\/files\?path=%2FUsers%2Faiagents%2F.*mascot\.png&download=true/);
+  await expect(dl).toHaveAttribute('title', '/Users/aiagents/.hermes/cache/generated/images/mascot.png');
+  await expect(reply.getByRole('img', { name: 'mascot.png' })).toBeVisible();
+  await expect(reply.locator('pre code')).toHaveText('print("hi")');
+  await expect(reply).not.toContainText('/Users/aiagents');
+});
