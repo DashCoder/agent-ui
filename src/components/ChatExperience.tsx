@@ -21,7 +21,7 @@ interface Props {
 export function ChatExperience({ savedPlacement = 'aside' }: Props) {
   const { config, loaded } = useSiteConfig();
   const chat = useChat(loaded);
-  const speech = useSpeech();
+  const speech = useSpeech(config.avatar.voice);
   const [saved, setSaved] = useState<SavedReply[]>([]);
   const [learn, setLearn] = useState(config.assistant.learnByDefault);
   const [avatarOpen, setAvatarOpen] = useState(true);

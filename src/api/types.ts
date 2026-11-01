@@ -10,6 +10,8 @@ export interface AvatarConfig {
   idleVideos: string[];
   talkVideos: string[];
   speakReplies: boolean;
+  /** Microsoft Edge neural voice, e.g. en-GB-RyanNeural. */
+  voice?: string;
 }
 
 /** Full settings document (admin only) — SiteConfig plus private sections. */

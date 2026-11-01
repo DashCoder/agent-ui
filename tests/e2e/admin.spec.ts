@@ -65,3 +65,14 @@ test.describe('admin console', () => {
       .toHaveAttribute('href', 'https://mac-mini.tailnet.ts.net:9119');
   });
 });
+
+test('avatar page lets the admin pick and test a natural voice', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await page.goto('/admin/avatar');
+  const voice = page.getByRole('combobox', { name: 'Voice' });
+  await expect(voice).toHaveValue('en-GB-RyanNeural');
+  await voice.selectOption('en-GB-SoniaNeural');
+  await page.getByRole('button', { name: '▶ Test voice' }).click();
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+});
