@@ -82,6 +82,7 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
       return json(route, { ok: true });
     }
     if (path === '/api/tts') return route.fulfill({ status: 204 });
+    if (path === '/api/simli/token') return json(route, { detail: 'The live avatar is not switched on.' }, 404);
     if (path === '/api/save-work/start') return json(route, { sent: true, devCode: '123456' });
     if (path === '/api/save-work/verify')
       return body.code === '123456' ? json(route, { email: body.email }) : json(route, { detail: 'That code is wrong or has expired' }, 400);

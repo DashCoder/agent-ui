@@ -19,6 +19,10 @@
   --c-save-border: #f2d77c;
   --c-save-text: #8a5a00;
   --c-primary: #4f46e5;
+  /* avatar stage: soft gradient behind the round face */
+  --avatar-bg: radial-gradient(120% 140% at 50% 0%, #eef0fd 0%, #c9cff6 45%, #6d6fd8 100%);
+  --avatar-ring: rgb(255 255 255 / 85%);
+  --avatar-glow: rgb(79 70 229 / 45%);
   --c-primary-text: #ffffff;
   --c-disabled: #c8d0da;
 

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockApi } from './mockApi';
+import { mockApi, SITE } from './mockApi';
 
 test.describe('visitor chat', () => {
   test('shows the avatar, greeting, quick replies and composer', async ({ page }) => {
@@ -80,5 +80,34 @@ test.describe('visitor chat', () => {
     await expect(page.getByTestId('msg-assistant').first()).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
+  });
+});
+
+test.describe('live avatar switch', () => {
+  const withSimli = () => {
+    const settings = structuredClone(SITE) as any;
+    settings.avatar.simliAvailable = true;
+    return settings;
+  };
+
+  test('is hidden unless the admin has switched Simli on', async ({ page }) => {
+    await mockApi(page);
+    await page.goto('/');
+    await expect(page.getByTestId('avatar')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Live avatar' })).toHaveCount(0);
+  });
+
+  test('remembers the choice and falls back to video when Simli fails', async ({ page }) => {
+    await mockApi(page, { settings: withSimli() });
+    await page.goto('/');
+    const live = page.getByRole('button', { name: 'Live avatar' });
+    await expect(live).toHaveAttribute('aria-pressed', 'false');
+    await live.click();
+    await expect(live).toHaveAttribute('aria-pressed', 'true');
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Live avatar' })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Play avatar and voice' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Live avatar unavailable' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Live avatar' })).toHaveAttribute('aria-pressed', 'false');
   });
 });

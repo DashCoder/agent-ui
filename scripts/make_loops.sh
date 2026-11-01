@@ -3,22 +3,18 @@
 #
 #   make_loops.sh <raw-folder> <out-folder>
 #
-# Every .mov/.mp4 becomes <name>.mp4 and the first .jpg becomes poster.jpg. Output matches the chat page's
-# wide avatar panel (2.4:1), so nothing gets cropped: the whole frame is shown, with a blurred copy of the
-# video filling the sides. Settings (environment variables):
-#   ZOOM=0.85  shrink the picture further (1 = fill the panel height; smaller = more zoomed out)
-#   TRIM=1.5   seconds cut from each end (remote-button press, beeps)
-#   W=1440 H=600 output size; FADE=0.6 loop crossfade seconds; FPS=25
+# Every .mov/.mp4 becomes <name>.mp4 and the first .jpg becomes poster.jpg: square, cropped around the face,
+# for the round avatar on the chat page. Works with portrait or landscape takes. Settings (environment variables):
+#   FACE_Y=0.6  where the middle of the circle sits, as a fraction of the frame height (lower = higher up)
+#   CROP=1      size of the square as a fraction of the frame's short side (1 = most zoomed out, 0.7 = closer)
+#   TRIM=1.5    seconds cut from each end (remote-button press, beeps)
+#   SIZE=720 output size; FADE=0.6 loop crossfade seconds; FPS=25
 set -euo pipefail
 IN=${1:-$HOME/avatar-raw}; OUT=${2:-$HOME/apps/agent-ui/public/avatar}
-W=${W:-1440}; H=${H:-600}; ZOOM=${ZOOM:-1}; TRIM=${TRIM:-1.5}; FADE=${FADE:-0.6}; FPS=${FPS:-25}
-FW=$(printf '%.0f' "$(echo "$W*$ZOOM/2" | bc -l)"); FW=$((FW*2))
-FH=$(printf '%.0f' "$(echo "$H*$ZOOM/2" | bc -l)"); FH=$((FH*2))
-# background: cover + blur + darken; foreground: whole frame fitted inside FWxFH, centred
-FRAME="split[bg][fg];\
-[bg]scale=$W:$H:force_original_aspect_ratio=increase,crop=$W:$H,boxblur=30:3,eq=brightness=-0.08[bgb];\
-[fg]scale=$FW:$FH:force_original_aspect_ratio=decrease[fgs];\
-[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p"
+SIZE=${SIZE:-720}; FACE_Y=${FACE_Y:-0.6}; CROP=${CROP:-1}; TRIM=${TRIM:-1.5}; FADE=${FADE:-0.6}; FPS=${FPS:-25}
+SIDE="min(iw\,ih)*$CROP"
+FRAME="crop=w='$SIDE':h='$SIDE':x='(iw-$SIDE)/2':y='max(0\,min(ih-$SIDE\,ih*$FACE_Y-$SIDE/2))',\
+scale=$SIZE:$SIZE,setsar=1,format=yuv420p"
 mkdir -p "$OUT"
 shopt -s nullglob nocaseglob
 for f in "$IN"/*.mov "$IN"/*.mp4; do
