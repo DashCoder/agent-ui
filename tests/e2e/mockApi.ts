@@ -62,7 +62,10 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
           { type: 'approval', runId: 'run1', prompt: `Allow the assistant to: ${body.text}` },
           { type: 'done', message: { id: id(), role: 'assistant', text: 'I need your OK first.', created_at: now() } }]) });
       }
-      const reply = /rate/i.test(body.text) ? 'Plans start at £49 per month.' : `You said: ${body.text}`;
+      const reply = /rate/i.test(body.text) ? 'Plans start at £49 per month.'
+        : /mascot/i.test(body.text)
+          ? 'Done! See https://github.com/inagentic/agent-ui for code.\n\nSaved at:\n/Users/aiagents/.hermes/cache/generated/images/mascot.png\n\n```py\nprint("hi")\n```'
+          : `You said: ${body.text}`;
       return route.fulfill({ status: 200, contentType: 'text/event-stream', body: sse([
         { type: 'start', userMessage: user }, { type: 'progress', label: 'Thinking…' },
         { type: 'delta', text: reply.slice(0, 10) }, { type: 'delta', text: reply.slice(10) },
@@ -81,6 +84,7 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
       state.saved = state.saved.filter((s) => !path.endsWith(s.id));
       return json(route, { ok: true });
     }
+    if (path === '/api/files') return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' });
     if (path === '/api/tts') return route.fulfill({ status: 204 });
     if (path === '/api/simli/token') return json(route, { detail: 'The live avatar is not switched on.' }, 404);
     if (path === '/api/save-work/start') return json(route, { sent: true, devCode: '123456' });
