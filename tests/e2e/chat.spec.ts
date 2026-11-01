@@ -111,3 +111,15 @@ test.describe('live avatar switch', () => {
     await expect(page.getByRole('button', { name: 'Live avatar' })).toHaveAttribute('aria-pressed', 'false');
   });
 });
+
+test('every avatar clip is preloaded once, so switching clips never reloads a video', async ({ page }) => {
+  const settings = structuredClone(SITE) as any;
+  settings.avatar.idleVideos = ['/avatar/idle_1.mp4', '/avatar/idle_2.mp4'];
+  settings.avatar.talkVideos = ['/avatar/talk_1.mp4', '/avatar/talk_2.mp4', '/avatar/talk_3.mp4'];
+  await mockApi(page, { settings });
+  await page.goto('/');
+  const clips = page.getByTestId('avatar').locator('video.avatar__clip');
+  await expect(clips).toHaveCount(5);
+  await expect(page.getByTestId('avatar').locator('video.avatar__clip.is-visible')).toHaveCount(1);
+  await expect(clips.first()).toHaveAttribute('preload', 'auto');
+});

@@ -5,6 +5,49 @@ import { ExpandIcon, PauseIcon, PlayIcon } from './Icons';
 import { SimliStage, type AudioSink } from './SimliStage';
 
 export type AvatarMode = 'video' | 'live';
+
+/**
+ * Every clip gets its own preloaded <video>; switching clips only crossfades opacity, so there is never a
+ * blank frame while a new file loads (which is what made the avatar flicker).
+ */
+function ClipStack({ clips, active, playing, visible, onEnded, className = '', poster }: {
+  clips: string[]; active: number; playing: boolean; visible: boolean; onEnded?: () => void;
+  className?: string; poster?: string;
+}) {
+  const refs = useRef<(HTMLVideoElement | null)[]>([]);
+  useEffect(() => {
+    refs.current.forEach((v, i) => {
+      if (!v) return;
+      if (playing && i === active) {
+        if (onEnded && v.ended) v.currentTime = 0;
+        void v.play().catch(() => {});
+      } else if (i !== active || !playing) {
+        v.pause();
+      }
+    });
+  }, [active, playing, onEnded, clips.length]);
+  return (
+    <>
+      {clips.map((src, i) => (
+        <video key={src + i} ref={(el) => { refs.current[i] = el; }} src={src} poster={i === 0 ? poster : undefined}
+               className={`avatar__media avatar__clip ${className} ${visible && i === active ? 'is-visible' : ''}`}
+               muted playsInline preload="auto" loop={!onEnded || clips.length === 1}
+               onEnded={onEnded} />
+      ))}
+    </>
+  );
+}
+
+/** True as soon as `on` is true; stays true until `on` has been false for `ms` (bridges reply → speech gaps). */
+function useSticky(on: boolean, ms: number) {
+  const [value, setValue] = useState(on);
+  useEffect(() => {
+    if (on) { setValue(true); return; }
+    const t = setTimeout(() => setValue(false), ms);
+    return () => clearTimeout(t);
+  }, [on, ms]);
+  return value;
+}
 const MODE_KEY = 'agent-ui.avatarMode';
 
 interface Props {
@@ -26,8 +69,6 @@ interface Props {
  */
 export function AvatarPanel({ avatar, talking, onPlayingChange, onSink, compact }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const idleRef = useRef<HTMLVideoElement>(null);
-  const talkRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [idleIdx, setIdleIdx] = useState(0);
   const [talkIdx, setTalkIdx] = useState(0);
@@ -37,20 +78,19 @@ export function AvatarPanel({ avatar, talking, onPlayingChange, onSink, compact 
   const live = canLive && mode === 'live';
   const hasVideo = avatar.idleVideos.length > 0;
   const hasTalk = avatar.talkVideos.length > 0;
-  const showTalk = playing && talking && hasTalk;
+  const talkingSticky = useSticky(talking, 900);
+  const showTalk = playing && talkingSticky && hasTalk;
 
-  // Pick a fresh talking clip each time the assistant starts a reply.
+  // Move to a different talking clip after each reply, while it is hidden, so the next one starts cleanly.
   useEffect(() => {
-    if (talking && avatar.talkVideos.length > 1) setTalkIdx((i) => (i + 1) % avatar.talkVideos.length);
-  }, [talking, avatar.talkVideos.length]);
-
-  useEffect(() => {
-    for (const v of [idleRef.current, talkRef.current]) {
-      if (!v) continue;
-      if (playing) void v.play().catch(() => {});
-      else v.pause();
+    if (!showTalk && avatar.talkVideos.length > 1) {
+      const t = setTimeout(() => setTalkIdx((i) => (i + 1) % avatar.talkVideos.length), 400);
+      return () => clearTimeout(t);
     }
-  }, [playing, idleIdx, talkIdx, showTalk, live]);
+  }, [showTalk, avatar.talkVideos.length]);
+
+  const nextIdle = useCallback(
+    () => setIdleIdx((i) => (i + 1) % Math.max(1, avatar.idleVideos.length)), [avatar.idleVideos.length]);
 
   const toggle = () => {
     const next = !playing;
@@ -79,17 +119,16 @@ export function AvatarPanel({ avatar, talking, onPlayingChange, onSink, compact 
   };
 
   return (
-    <div ref={wrapRef} className={`avatar ${compact ? 'avatar--compact' : ''} ${talking ? 'is-talking' : ''}`}
+    <div ref={wrapRef} className={`avatar ${compact ? 'avatar--compact' : ''} ${talkingSticky ? 'is-talking' : ''}`}
          data-testid="avatar">
       <div className="avatar__circle">
         {hasVideo ? (
           <>
-            <video ref={idleRef} className="avatar__media" src={avatar.idleVideos[idleIdx]} poster={avatar.posterUrl}
-                   muted playsInline loop={avatar.idleVideos.length === 1}
-                   onEnded={() => setIdleIdx((i) => (i + 1) % avatar.idleVideos.length)} />
+            <ClipStack clips={avatar.idleVideos} active={idleIdx} playing={playing} visible poster={avatar.posterUrl}
+                       onEnded={avatar.idleVideos.length > 1 ? nextIdle : undefined} />
             {hasTalk && (
-              <video ref={talkRef} className={`avatar__media avatar__talk ${showTalk ? 'is-visible' : ''}`}
-                     src={avatar.talkVideos[talkIdx]} muted playsInline loop />
+              <ClipStack clips={avatar.talkVideos} active={talkIdx} playing={playing && showTalk} visible={showTalk}
+                         className="avatar__talk" />
             )}
           </>
         ) : (
