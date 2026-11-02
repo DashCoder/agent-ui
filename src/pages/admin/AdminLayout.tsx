@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
+import { PLUGIN_ADMIN_PAGES } from '../../plugins';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { BrandMark } from '../../components/Icons';
@@ -13,8 +14,23 @@ export const NAV = [
   { to: '/admin/calendar', label: 'Calendar', icon: '📅' },
   { to: '/admin/knowledge', label: 'Knowledge', icon: '📚' },
   { to: '/admin/hermes', label: 'Hermes', icon: '🤖' },
+  { to: '/admin/audit', label: 'Audit', icon: '📜' },
   { to: '/admin/settings', label: 'Settings', icon: '⚙️' },
 ];
+
+type NavItem = { to: string; label: string; icon: string; end?: boolean };
+
+/** Core pages plus plugin pages, each plugin page placed after the page it names (default: before Settings). */
+export function navItems(): NavItem[] {
+  const items: NavItem[] = [...NAV];
+  for (const pg of PLUGIN_ADMIN_PAGES) {
+    const item = { to: `/admin/${pg.path}`, label: pg.label, icon: pg.icon };
+    const anchor = pg.after === undefined ? -1 : items.findIndex((n) => n.to === (pg.after ? `/admin/${pg.after}` : '/admin'));
+    if (anchor >= 0) items.splice(anchor + 1, 0, item);
+    else items.splice(items.length - 1, 0, item);
+  }
+  return items;
+}
 
 export function AdminLayout() {
   const { config } = useSiteConfig();
@@ -47,7 +63,7 @@ export function AdminLayout() {
       </header>
       <div className="admin__body">
         <nav className="admin__nav" aria-label="Admin">
-          {NAV.map((n) => (
+          {navItems().map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className="navbtn">
               <span className="navbtn__icon" aria-hidden>{n.icon}</span>{n.label}
             </NavLink>
@@ -63,14 +79,4 @@ export function AdminLayout() {
   );
 }
 
-export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
-  return (
-    <div className="page-head">
-      <div>
-        <h1 className="page-head__title">{title}</h1>
-        {subtitle && <p className="page-head__sub">{subtitle}</p>}
-      </div>
-      {actions && <div className="page-head__actions">{actions}</div>}
-    </div>
-  );
-}
+export { PageHeader } from './PageHeader';

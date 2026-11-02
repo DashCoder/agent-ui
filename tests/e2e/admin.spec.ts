@@ -76,3 +76,24 @@ test('avatar page lets the admin pick and test a natural voice', async ({ page }
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('status')).toHaveText('Saved');
 });
+
+test('plugin pages appear in the sidebar after the page they name; incompatible plugins are skipped', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await page.goto('/admin');
+  const nav = page.getByRole('navigation', { name: 'Admin' });
+  const labels = await nav.getByRole('link').allInnerTexts();
+  const clean = labels.map((l) => l.replace(/^\W+\s*/u, '').trim());
+  expect(clean.indexOf('Demo')).toBe(clean.indexOf('Builder') + 1);
+  expect(clean).not.toContain('Future');
+  await nav.getByRole('link', { name: 'Demo' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Demo plugin' })).toBeVisible();
+  await page.getByRole('button', { name: 'Clicked 0' }).click();
+  await expect(page.getByRole('button', { name: 'Clicked 1' })).toBeVisible();
+});
+
+test('the audit page lists events', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await page.goto('/admin/audit');
+  await expect(page.getByRole('heading', { level: 1, name: 'Audit trail' })).toBeVisible();
+  await expect(page.getByTestId('audit-row')).toHaveCount(1);
+});

@@ -121,6 +121,8 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
       state.knowledge.unshift(item);
       return json(route, item);
     }
+    if (path === '/api/admin/audit') return json(route, { items: [
+      { id: 'e1', ts: now(), actor: 'agent', action: 'pr.proposed', target: 'DashCoder/agent-api#7', detail: {} }] });
     if (path === '/api/admin/hermes') return json(route, {
       mode: 'hermes', status: { mode: 'hermes', reachable: true, authorized: true, models: ['hermes-agent'] },
       skills: [{ name: 'book-appointment', description: 'Books a slot' }], dashboardUrl: 'https://mac-mini.tailnet.ts.net:9119',

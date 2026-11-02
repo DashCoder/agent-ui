@@ -4,6 +4,8 @@ import { LoginPage } from './pages/LoginPage';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AvatarSettings } from './pages/admin/AvatarSettings';
 import { Builder } from './pages/admin/Builder';
+import { Audit } from './pages/admin/Audit';
+import { PLUGIN_ADMIN_PAGES } from './plugins';
 import { Calendar } from './pages/admin/Calendar';
 import { Dashboard } from './pages/admin/Dashboard';
 import { Hermes } from './pages/admin/Hermes';
@@ -24,7 +26,9 @@ export function App() {
         <Route path="calendar" element={<Calendar />} />
         <Route path="knowledge" element={<Knowledge />} />
         <Route path="hermes" element={<Hermes />} />
+        <Route path="audit" element={<Audit />} />
         <Route path="settings" element={<Settings />} />
+        {PLUGIN_ADMIN_PAGES.map((pg) => <Route key={pg.path} path={pg.path} element={pg.element} />)}
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

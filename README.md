@@ -16,7 +16,7 @@ admin console. Built to sit in front of **[Hermes Agent](https://hermes-agent.no
 
 **Admin console (`/admin`)**
 - Dashboard with a *Getting started* checklist and stats
-- Builder (chat preview), Avatar, Phone, Calendar, Knowledge, **Hermes** (status, skills, setup steps, link to the full
+- Builder (chat preview), Avatar, Phone, Calendar, Knowledge, **Audit trail**, **Hermes** (status, skills, setup steps, link to the full
   Hermes dashboard), and Settings (branding, greeting, quick replies, business answers)
 
 ## Try it locally (5 minutes, no Hermes needed)
@@ -70,6 +70,33 @@ See [docs/HERMES_MAC_MINI_SETUP.md](docs/HERMES_MAC_MINI_SETUP.md), section 10.
 | `npm run test:e2e` | Playwright tests (desktop + mobile), against a mocked API, no backend needed |
 
 First Playwright run on a new machine: `npx playwright install chromium`.
+
+## Plugins
+
+Extra admin pages can ship as **UI plugins** that live outside this repo. A plugin file exports a list of
+`AgentUIPlugin`; build the app with it by pointing `AGENT_UI_PLUGINS` at that file:
+
+```bash
+AGENT_UI_PLUGINS=../my-plugins/index.ts npm run build
+```
+
+```tsx
+// ../my-plugins/index.ts(x)
+import { PageHeader, request, UI_PLUGIN_API, type AgentUIPlugin } from '@agent-ui/core';
+
+function Reports() { return <PageHeader title="Reports" />; }
+
+const plugins: AgentUIPlugin[] = [
+  { id: 'reports', apiVersions: [UI_PLUGIN_API],
+    adminPages: [{ path: 'reports', label: 'Reports', icon: '📈', element: <Reports />, after: 'knowledge' }] },
+];
+export default plugins;
+```
+
+Plugins import only `@agent-ui/core` (API helpers, shared types, `PageHeader`, `FormFooter`) plus `react`,
+`react-dom` and `react-router-dom`, which resolve to this repo's copies. A plugin that doesn't support this build's
+`UI_PLUGIN_API` is skipped with a console warning. The default build has no plugins; `tests/fixtures/demo-plugin.tsx`
+is a complete example and is loaded by the e2e tests.
 
 ## Customise
 
