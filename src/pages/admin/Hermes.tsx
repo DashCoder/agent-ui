@@ -3,7 +3,7 @@ import { api } from '../../api/client';
 import type { HermesInfo } from '../../api/types';
 import { PageHeader } from './AdminLayout';
 
-const GUIDE_URL = 'https://github.com/YOUR-ORG/agent-ui/blob/main/docs/HERMES_MAC_MINI_SETUP.md';
+const GUIDE_URL = 'https://github.com/DashCoder/agent-ui/blob/main/docs/HERMES_MAC_MINI_SETUP.md';
 
 export function Hermes() {
   const [info, setInfo] = useState<HermesInfo | null>(null);

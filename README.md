@@ -2,7 +2,7 @@
 
 Open-source **React + TypeScript** boilerplate for AI agent products: a visitor chat with a talking avatar, plus an
 admin console. Built to sit in front of **[Hermes Agent](https://hermes-agent.nousresearch.com)** through
-[agent-api](https://github.com/YOUR-ORG/agent-api), and reusable across projects.
+[agent-api](https://github.com/DashCoder/agent-api), and reusable across projects.
 
 | Chat | Admin |
 |---|---|
