@@ -1,5 +1,5 @@
 import type {
-  Approval, ChatMessage, Dashboard, HermesInfo, KnowledgeItem, SavedReply, SiteConfig, SiteSettings,
+  Approval, AuditEvent, ChatMessage, Dashboard, HermesInfo, KnowledgeItem, SavedReply, SiteConfig, SiteSettings,
   StreamEvent, User,
 } from './types';
 
@@ -12,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   const res = await fetch(BASE + path, { ...init, headers, credentials: 'include' });
@@ -27,7 +27,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-const json = (body: unknown) => JSON.stringify(body);
+export const json = (body: unknown) => JSON.stringify(body);
 
 /** Parses a text/event-stream body and calls onEvent for each JSON event. */
 export async function readEventStream(body: ReadableStream<Uint8Array>, onEvent: (e: StreamEvent) => void) {
@@ -99,6 +99,8 @@ export const api = {
     request<KnowledgeItem>('/api/admin/knowledge', { method: 'POST', body: json({ kind, value }) }),
   deleteKnowledge: (id: string) => request<{ ok: true }>(`/api/admin/knowledge/${id}`, { method: 'DELETE' }),
   hermes: () => request<HermesInfo>('/api/admin/hermes'),
+
+  auditLog: () => request<{ items: AuditEvent[] }>('/api/admin/audit'),
 
   simliToken: () => request<{ sessionToken: string; maxSessionSeconds: number }>('/api/simli/token', { method: 'POST' }),
 

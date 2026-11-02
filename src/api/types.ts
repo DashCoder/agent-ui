@@ -97,3 +97,12 @@ export interface User {
   username: string;
   role: 'admin';
 }
+
+export interface AuditEvent {
+  id: string;
+  ts: number;
+  actor: string;
+  action: string;
+  target: string;
+  detail: Record<string, unknown>;
+}
