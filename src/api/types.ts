@@ -4,7 +4,7 @@ export interface SiteConfig {
   avatar: AvatarConfig;
   quickReplies: string[];
   /** Installed agents, with what they suggest for the chat. */
-  plugins?: { name: string; version: string; quickReplies?: string[]; assistantHint?: string }[];
+  plugins?: { name: string; version: string; agentName?: string; quickReplies?: string[]; assistantHint?: string }[];
 }
 
 export interface AvatarConfig {

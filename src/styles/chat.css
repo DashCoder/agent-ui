@@ -318,3 +318,17 @@
   border: 0; border-radius: 0; box-shadow: none; resize: none; background: transparent; padding: 10px 12px 4px;
   font-family: var(--font-slack); font-size: 15px; min-height: 42px; width: 100%; }
 .admin-theme .sl-wrap .sl-composer__input:focus { border: 0; box-shadow: none; outline: none; }
+
+/* Markdown tables in replies (Kai's scorecards), drawn like Slack's tables */
+.chat-table { margin: 8px 0 4px; max-width: 100%; overflow-x: auto; border: 1px solid var(--s-border, #dddddd);
+  border-radius: 8px; width: fit-content; }
+.chat-table table { border-collapse: collapse; font-size: 15px; line-height: 1.4; }
+.chat-table th, .chat-table td { padding: 8px 14px; text-align: left; border-bottom: 1px solid var(--s-border, #dddddd);
+  border-right: 1px solid var(--s-border, #dddddd); white-space: nowrap; vertical-align: middle; }
+.chat-table th:last-child, .chat-table td:last-child { border-right: 0; }
+.chat-table tbody tr:last-child td { border-bottom: 0; }
+.chat-table th { font-weight: 900; background: #fff; }
+.chat-table td:first-child { white-space: normal; min-width: 180px; }
+.chat-table tr.is-sub td:first-child { color: var(--s-text, #1d1c1d); }
+.chat-table td:last-child, .chat-table th:last-child { text-align: center; }
+.chat-table strong { font-weight: 900; }

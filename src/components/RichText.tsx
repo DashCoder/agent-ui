@@ -99,6 +99,34 @@ const HEADING = /^\s*#{1,6}\s+(.*)$/;
 
 /** One paragraph block: lines, with runs of "- item" / "1. item" turned into real lists and "## Title" into a
  * small heading. */
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const TABLE_SEP = /^\s*\|?(\s*:?-{2,}:?\s*\|)+\s*:?-{0,}:?\s*\|?\s*$/;
+const cells = (line: string) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+
+/** A Markdown table, drawn like Slack's: a bordered grid with a bold header row (e.g. Kai's KPI scorecard). */
+function Table({ rows }: { rows: string[] }) {
+  const [head, , ...body] = rows;
+  const titles = cells(head);
+  return (
+    <div className="chat-table" data-testid="chat-table">
+      <table>
+        <thead><tr>{titles.map((t, i) => <th key={i} scope="col">{inline(t)}</th>)}</tr></thead>
+        <tbody>
+          {body.map((r, i) => {
+            const c = cells(r);
+            const sub = c[0]?.startsWith('↳');
+            return (
+              <tr key={i} className={sub ? 'is-sub' : undefined}>
+                {titles.map((_, j) => <td key={j}>{inline(c[j] ?? '')}</td>)}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function Block({ text }: { text: string }) {
   const lines = text.split('\n');
   const out: ReactNode[] = [];
@@ -114,7 +142,17 @@ function Block({ text }: { text: string }) {
     out.push(list.ordered ? <ol key={out.length}>{items}</ol> : <ul key={out.length}>{items}</ul>);
     list = null;
   };
-  for (const line of lines) {
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    if (TABLE_ROW.test(line) && TABLE_SEP.test(lines[li + 1] ?? '')) {
+      flushPara(); flushList();
+      const rows = [line, lines[li + 1]];
+      li += 2;
+      while (li < lines.length && TABLE_ROW.test(lines[li])) rows.push(lines[li++]);
+      li--;
+      out.push(<Table key={out.length} rows={rows} />);
+      continue;
+    }
     const b = line.match(BULLET);
     const n = !b && line.match(NUMBER);
     const h = !b && !n && line.match(HEADING);

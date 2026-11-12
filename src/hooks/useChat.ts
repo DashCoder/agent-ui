@@ -3,12 +3,14 @@ import { api } from '../api/client';
 import type { Approval, ChatMessage } from '../api/types';
 
 const SESSION_KEY = 'agent-ui.session';
+/** One conversation per agent (the main assistant, or ?agent=kpi …), remembered in this browser. */
+const keyFor = (agent?: string) => (agent ? `${SESSION_KEY}.${agent}` : SESSION_KEY);
 
-function readSession(): string | null {
-  try { return localStorage.getItem(SESSION_KEY); } catch { return null; }
+function readSession(agent?: string): string | null {
+  try { return localStorage.getItem(keyFor(agent)); } catch { return null; }
 }
-function writeSession(id: string | null) {
-  try { id ? localStorage.setItem(SESSION_KEY, id) : localStorage.removeItem(SESSION_KEY); } catch { /* private mode */ }
+function writeSession(id: string | null, agent?: string) {
+  try { id ? localStorage.setItem(keyFor(agent), id) : localStorage.removeItem(keyFor(agent)); } catch { /* private mode */ }
 }
 
 export interface ChatState {
@@ -31,7 +33,7 @@ export interface ChatState {
  * @param ready  wait until the visitor cookie exists (first /api/config call) before
  *               creating a session, so parallel first requests don't get different visitors.
  */
-export function useChat(ready = true): ChatState {
+export function useChat(ready = true, agent?: string): ChatState {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -42,19 +44,19 @@ export function useChat(ready = true): ChatState {
   const abortRef = useRef<AbortController | null>(null);
 
   const startNew = useCallback(async () => {
-    const s = await api.createSession();
-    writeSession(s.id);
+    const s = await api.createSession(agent);
+    writeSession(s.id, agent);
     setSessionId(s.id);
     setMessages(s.messages);
     return s.id;
-  }, []);
+  }, [agent]);
 
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
     (async () => {
       try {
-        const existing = readSession();
+        const existing = readSession(agent);
         if (existing) {
           try {
             const { messages: m } = await api.messages(existing);
@@ -62,9 +64,9 @@ export function useChat(ready = true): ChatState {
             return;
           } catch { /* expired or other browser: start fresh */ }
         }
-        const s = await api.createSession();
+        const s = await api.createSession(agent);
         if (cancelled) return;
-        writeSession(s.id);
+        writeSession(s.id, agent);
         setSessionId(s.id);
         setMessages(s.messages);
       } catch (e) {
@@ -72,7 +74,7 @@ export function useChat(ready = true): ChatState {
       }
     })();
     return () => { cancelled = true; };
-  }, [ready]);
+  }, [ready, agent]);
 
   const send = useCallback(async (text: string, opts: { learn: boolean; attachments?: string[] }) => {
     const trimmed = text.trim();
@@ -89,7 +91,7 @@ export function useChat(ready = true): ChatState {
     let acc = '';
     try {
       const sid = sessionId ?? (await startNew());
-      await api.stream(sid, { text: trimmed, learn: opts.learn, attachments: opts.attachments ?? [] }, (ev) => {
+      await api.stream(sid, { text: trimmed, learn: opts.learn, attachments: opts.attachments ?? [], agent }, (ev) => {
         switch (ev.type) {
           case 'start':
             setMessages((m) => m.map((x) => (x.id === optimistic.id ? ev.userMessage : x)));
@@ -125,7 +127,7 @@ export function useChat(ready = true): ChatState {
       setStreaming(false);
       abortRef.current = null;
     }
-  }, [sessionId, startNew, streaming]);
+  }, [sessionId, startNew, streaming, agent]);
 
   const answerApproval = useCallback(async (approve: boolean) => {
     if (!approval || !sessionId) return;
@@ -142,7 +144,7 @@ export function useChat(ready = true): ChatState {
   const stop = useCallback(() => abortRef.current?.abort(), []);
 
   const reset = useCallback(async () => {
-    writeSession(null);
+    writeSession(null, agent);
     setApproval(null);
     await startNew();
   }, [startNew]);

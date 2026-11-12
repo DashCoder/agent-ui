@@ -9,7 +9,8 @@ export interface MockState {
   saved: { id: string; text: string; created_at: number }[];
   settings: Record<string, any>;
   knowledge: { id: string; kind: string; value: string; created_at: number }[];
-  lastSend?: { text: string; learn: boolean };
+  lastSend?: { text: string; learn: boolean; agent?: string };
+  sessionAgent?: string;
   plugins: any[];
   jobs: any[];
   installerReady: boolean;
@@ -69,7 +70,8 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
 
     if (path === '/api/config') return json(route, { brand: state.settings.brand, assistant: state.settings.assistant,
       avatar: state.settings.avatar, quickReplies: state.settings.quickReplies,
-      plugins: [{ name: 'demo', version: '1.0.0', quickReplies: ['List my last 5 Jira tickets', 'What are your rates?'] }] });
+      plugins: [{ name: 'demo', version: '1.0.0', quickReplies: ['List my last 5 Jira tickets', 'What are your rates?'] },
+                { name: 'kpi', version: '2.0.0', agentName: 'Kai', quickReplies: ['Last 7 days', 'This week', 'Show my scorecard'] }] });
     if (path.startsWith('/api/chat/sessions/s1/messages/') && method === 'DELETE') {
       const mid = path.split('/').pop()!;
       const i = state.log.findIndex((m) => m.id === mid);
@@ -79,11 +81,14 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
       state.log = state.log.filter((m) => !removed.includes(m.id));
       return json(route, { removed });
     }
-    if (path === '/api/chat/sessions' && method === 'POST')
-      return json(route, { id: 's1', messages: [{ id: 'g', role: 'assistant', text: state.settings.assistant.greeting, created_at: now() }] });
+    if (path === '/api/chat/sessions' && method === 'POST') {
+      state.sessionAgent = body.agent;
+      return json(route, { id: 's1', messages: [{ id: 'g', role: 'assistant', created_at: now(),
+        text: body.agent === 'kpi' ? "Hi! I'm Kai 👋 I show KPI scorecards. What would you like to do?" : state.settings.assistant.greeting }] });
+    }
     if (path.endsWith('/messages')) return json(route, {}, 404);
     if (path.endsWith('/stream')) {
-      state.lastSend = { text: body.text, learn: body.learn };
+      state.lastSend = { text: body.text, learn: body.learn, agent: body.agent };
       const user = { id: id(), role: 'user', text: body.text, created_at: now() };
       const answerId = id();
       state.log.push({ id: user.id, role: 'user' }, { id: answerId, role: 'assistant' });
@@ -95,6 +100,8 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
       }
       const reply = /tools/i.test(body.text)
         ? 'I have six tools whose names start with `mcp__inagentic__` (two underscores):\n\n1. mcp__inagentic__get_jira_ticket: Reads a Jira ticket.\n2. `mcp__inagentic__propose_pull_request`: Opens a pull request.\n\n- one\n- two'
+        : /scorecard/i.test(body.text)
+          ? "Here's your scorecard for **the last 7 days (6–12 Nov)**:\n\n**Outreach** 🔴 3% of target\n\n| KPI | Actual / target | Status |\n|---|---|---|\n| **Communications (last 7 days)** | **2 / 75** | 🔴 |\n| ↳ Calls (last 7 days) | 0 / 10 | 🔴 |\n| ↳ Emails (last 7 days) | 2 / 25 | 🔴 |\n\nKeep going!"
         : /long/i.test(body.text) ? Array.from({ length: 40 }, (_, n) => `Line ${n + 1} of a long answer.`).join('\n\n')
         : /rate/i.test(body.text) ? 'Plans start at £49 per month.'
         : /mascot/i.test(body.text)

@@ -4,7 +4,7 @@ import type { SiteConfig } from '../api/types';
 
 /** Used until /api/config answers, and if the API is down. */
 export const FALLBACK_CONFIG: SiteConfig = {
-  brand: { name: 'Agent UI', adminTitle: 'builder.example.com', landingUrl: '/' },
+  brand: { name: 'Agent UI', adminTitle: '', landingUrl: '/' },
   assistant: { name: 'Assistant', greeting: 'Hi! How can I help you today?', learnByDefault: false },
   avatar: { posterUrl: '/avatar/poster.svg', idleVideos: [], talkVideos: [], speakReplies: false },
   quickReplies: [],
@@ -20,7 +20,6 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
     try { setConfig(await api.config()); } catch { /* keep fallback */ } finally { setLoaded(true); }
   }, []);
   useEffect(() => { void reload(); }, [reload]);
-  useEffect(() => { document.title = config.assistant.name; }, [config.assistant.name]);
   return <SiteConfigContext.Provider value={{ config, loaded, reload }}>{children}</SiteConfigContext.Provider>;
 }
 

@@ -55,6 +55,8 @@ test.describe('admin console', () => {
     await expect(pick.locator('option')).toHaveText(['All agents', 'Demo agent — demo', 'Legacy — legacy']);
     await pick.selectOption('demo');
     await expect(page).toHaveURL(/\/admin\?agent=demo$/);
+    await expect(page).toHaveTitle('Dashboard · Demo agent');
+    await expect(page.getByRole('link', { name: "View Demo agent's chat ↗" })).toHaveAttribute('href', '/?agent=demo');
     await expect(page.getByRole('heading', { level: 1, name: 'Demo agent' })).toBeVisible();
     const nav = page.getByRole('navigation', { name: 'Admin sections' });
     await expect(nav.getByRole('link', { name: /^Demo\s*3$/ })).toBeVisible();
@@ -114,7 +116,7 @@ test.describe('admin console', () => {
     await expect(sugg.getByRole('button', { name: '+ What are your rates?' })).toHaveCount(0);   // already a quick reply
     await sugg.getByRole('button', { name: '+ List my last 5 Jira tickets' }).click();
     await expect(page.getByTestId('pills')).toContainText('List my last 5 Jira tickets');
-    await expect(page.getByTestId('pill-suggestions')).toHaveCount(0);
+    await expect(page.getByTestId('pill-suggestions').getByRole('button', { name: '+ List my last 5 Jira tickets' })).toHaveCount(0);
     await expect(page.locator('.builder-frame').getByRole('button', { name: 'List my last 5 Jira tickets' })).toBeVisible();
   });
 

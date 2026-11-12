@@ -30,7 +30,7 @@ export function LoginPage() {
   return (
     <div className="admin-theme login">
       <form className="login__card" onSubmit={submit}>
-        <div className="login__brand"><BrandMark /> {config.brand.adminTitle}</div>
+        <div className="login__brand"><BrandMark /> {config.brand.consoleName || 'InAgentic Command'}</div>
         <h1>Admin sign in</h1>
         <label className="field"><span>Username</span>
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required />

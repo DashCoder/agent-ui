@@ -225,3 +225,23 @@ test('Slack-style message box: formatting, emoji, mention, shortcuts and Enter t
   await box.type('line two');
   await expect(box).toHaveValue('line one\nline two');
 });
+
+test("an agent's own chat (View site from Kai): its name, greeting and quick replies, and tables like Slack", async ({ page }) => {
+  const state = await mockApi(page);
+  await page.goto('/?agent=kpi');
+  await expect(page.getByRole('heading', { level: 1, name: 'Kai' })).toBeVisible();
+  await expect(page).toHaveTitle('Kai');
+  const greeting = page.getByTestId('msg-assistant').first();
+  await expect(greeting.locator('.smsg__name')).toHaveText('Kai');
+  await expect(greeting).toContainText("Hi! I'm Kai");
+  expect(state.sessionAgent).toBe('kpi');
+  await expect(greeting.getByRole('button', { name: 'This week' })).toBeVisible();
+  await greeting.getByRole('button', { name: 'Show my scorecard' }).click();
+  expect(state.lastSend?.agent).toBe('kpi');
+  const table = page.getByTestId('chat-table');
+  await expect(table.locator('th')).toHaveText(['KPI', 'Actual / target', 'Status']);
+  await expect(table.locator('tbody tr')).toHaveCount(3);
+  await expect(table.locator('tbody tr').first().locator('strong').first()).toHaveText('Communications (last 7 days)');
+  await expect(table.locator('tbody tr').nth(1)).toContainText('↳ Calls (last 7 days)0 / 10🔴');
+  await expect(page.getByTestId('msg-assistant').last()).toContainText('Keep going!');
+});

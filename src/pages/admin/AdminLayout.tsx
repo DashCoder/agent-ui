@@ -61,8 +61,17 @@ export function AdminLayout() {
     if (agent.id === ALL && href.includes('?agent=')) return false; // links in "Agents" open another agent
     return location.pathname.replace(/\/$/, '') === href.split('?')[0];
   };
-  const host = config.brand.adminTitle || window.location.host;
+  // the old default "builder.example.com" was a placeholder: show the real address instead
+  const title = config.brand.adminTitle && config.brand.adminTitle !== 'builder.example.com' ? config.brand.adminTitle : '';
+  const host = title || window.location.host;
   const product = config.brand.consoleName || 'InAgentic Command';
+  // the browser tab says where you are: the agent picked (or the product) and the page
+  const pageName = agent.menu.flatMap((sec) => sec.items).find((i) => isActive(hrefFor(i, agent.id)))?.label;
+  useEffect(() => {
+    document.title = [pageName, agent.id === ALL ? product : agent.name].filter(Boolean).join(' · ');
+  }, [pageName, agent.id, agent.name, product]);
+  // "View site" opens the chat as the agent you're looking at
+  const site = `${config.brand.landingUrl || '/'}${agent.id === ALL ? '' : `${(config.brand.landingUrl || '/').includes('?') ? '&' : '?'}agent=${agent.id}`}`;
 
   return (
     <AgentContext.Provider value={{ agent, agents }}>
@@ -75,7 +84,7 @@ export function AdminLayout() {
           </Link>
           <span className="cmd__spacer" />
           <button type="button" className="cmd__toplink" onClick={() => void logout()}>Sign out</button>
-          <a href={config.brand.landingUrl || '/'} className="cmd__toplink">View site ↗</a>
+          <a href={site} className="cmd__toplink">View {agent.id === ALL ? 'site' : `${agent.name}'s chat`} ↗</a>
         </header>
         <div className="cmd__body">
           <aside className={`cmd__side ${collapsed ? 'cmd__side--collapsed' : ''}`}>

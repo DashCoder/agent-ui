@@ -18,6 +18,8 @@ import { SaveWorkForm } from './SaveWorkForm';
 interface Props {
   /** "aside": the visitor page (full screen). "inline": a preview inside the admin ("Try it"). */
   savedPlacement?: 'aside' | 'inline';
+  /** Talk to one installed agent (/?agent=kpi): its name, greeting and quick replies. */
+  agent?: string;
 }
 
 const SIDE_KEY = 'agent-ui.sidebar';
@@ -27,9 +29,10 @@ const GROUP_S = 5 * 60;
  * The visitor experience, laid out like Slack: the avatar in a dark sidebar on the left, a conversation with square
  * pictures and names on the right, quick replies as message buttons, and Slack's message box.
  */
-export function ChatExperience({ savedPlacement = 'aside' }: Props) {
+export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
   const { config, loaded } = useSiteConfig();
-  const chat = useChat(loaded);
+  const one = agent ? config.plugins?.find((p) => p.name === agent) : undefined;
+  const chat = useChat(loaded, one ? agent : undefined);
   const sinkRef = useRef<AudioSink | null>(null);
   const speech = useSpeech(config.avatar.voice, sinkRef);
   const onSink = useCallback((sink: AudioSink | null) => { sinkRef.current = sink; }, []);
@@ -44,8 +47,10 @@ export function ChatExperience({ savedPlacement = 'aside' }: Props) {
   const [savedOpen, setSavedOpen] = useState(() => typeof window === 'undefined' || !window.matchMedia?.('(max-width: 760px)').matches);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSpoken = useRef<string | null>(null);
-  const name = config.assistant.name;
+  const name = one ? one.agentName ?? agent! : config.assistant.name;
+  const quick = one?.quickReplies?.length ? one.quickReplies : config.quickReplies;
   const embedded = savedPlacement === 'inline';
+  useEffect(() => { if (!embedded) document.title = name; }, [name, embedded]);
 
   useEffect(() => setLearn(config.assistant.learnByDefault), [config.assistant.learnByDefault]);
   useEffect(() => {
@@ -105,7 +110,7 @@ export function ChatExperience({ savedPlacement = 'aside' }: Props) {
   const lastAgent = [...chat.messages].reverse().find((m) => m.role === 'assistant');
   const status = chat.streaming ? 'Replying…' : speech.speaking ? 'Speaking…' : 'Online';
   const commands: Command[] = [
-    ...config.quickReplies.map((q) => ({ label: q, hint: 'Ask', run: () => send(q) })),
+    ...quick.map((q) => ({ label: q, hint: 'Ask', run: () => send(q) })),
     { label: 'Save my work', hint: 'Link to your email', run: () => setSaveWorkOpen(true) },
     { label: 'Clear chat', hint: 'Start again', run: () => setConfirmClear(true) },
   ];
@@ -117,7 +122,7 @@ export function ChatExperience({ savedPlacement = 'aside' }: Props) {
   const quickReplies = !chat.streaming && !chat.approval && (
     <div className="sl-actions" role="group" aria-label="Suggestions">
       <button type="button" className="sl-btn" onClick={() => setSaveWorkOpen(true)}>🔐 Save my work</button>
-      {config.quickReplies.map((q) => (
+      {quick.map((q) => (
         <button key={q} type="button" className="sl-btn" onClick={() => send(q)}>{q}</button>
       ))}
     </div>
