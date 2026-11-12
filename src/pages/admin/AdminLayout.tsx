@@ -4,6 +4,7 @@ import { api } from '../../api/client';
 import { AdminIcon } from '../../components/AdminIcons';
 import { BrandMark } from '../../components/Icons';
 import { useSiteConfig } from '../../hooks/useSiteConfig';
+import { BADGES_EVENT } from './badges';
 import { AgentContext, ALL, agentFor, buildAgents, hrefFor, switchTo, type Agent } from './agents';
 
 /**
@@ -33,7 +34,14 @@ export function AdminLayout() {
   // Start collapsed on narrow screens so content keeps most of the width.
   useEffect(() => { if (window.matchMedia('(max-width: 760px)').matches) setCollapsed(true); }, []);
 
-  // Counts on menu items (e.g. emails waiting for review), refreshed when the agent changes.
+  // Counts on menu items (e.g. emails waiting for review): refreshed when the agent or page changes, and when a page
+  // calls refreshBadges() after changing something.
+  const [badgeTick, setBadgeTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setBadgeTick((n) => n + 1);
+    window.addEventListener(BADGES_EVENT, bump);
+    return () => window.removeEventListener(BADGES_EVENT, bump);
+  }, []);
   useEffect(() => {
     if (state !== 'ok') return;
     let live = true;
@@ -42,7 +50,7 @@ export function AdminLayout() {
       item.badge().then((n) => live && setBadges((b) => ({ ...b, [`${agent.id}:${item.to}`]: n }))).catch(() => {});
     }
     return () => { live = false; };
-  }, [agent, state]);
+  }, [agent, state, location.pathname, badgeTick]);
 
   const logout = async () => {
     await api.logout().catch(() => {});

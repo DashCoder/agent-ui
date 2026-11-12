@@ -5,6 +5,7 @@
 export { ApiError, request, json, api } from './api/client';
 export type * from './api/types';
 export { PageHeader } from './pages/admin/PageHeader';
+export { refreshBadges } from './pages/admin/badges';
 export { FormFooter } from './pages/admin/AvatarSettings';
 export { Stat } from './pages/admin/Dashboard';
 export { AdminIcon } from './components/AdminIcons';
