@@ -126,7 +126,8 @@ export interface Conversation {
 
 export interface ConversationMessage { id: string; role: 'user' | 'assistant'; text: string; created_at: number }
 
-export interface UsageCounts { messages: number; conversations: number; actions: number; toolCalls: number }
+export interface UsageCounts { messages: number; conversations: number; actions: number; toolCalls: number;
+  modelCalls?: number; cost?: number }
 
 export interface Usage {
   agents: { id: string; today: UsageCounts; month: UsageCounts }[];
@@ -150,4 +151,20 @@ export interface PluginCheck {
   id: string; url: string; ref: string; commit: string; repo: string; name: string; title: string; version?: string;
   description: string; settings: PluginSetting[]; ui: boolean; python?: string; author: string; date: string;
   message: string; warnings: string[]; update: boolean;
+}
+
+export type Provider = 'ollama' | 'openrouter' | 'bedrock';
+export interface ModelChoice { provider: string; model: string }
+export interface AgentModel {
+  id: string; name: string; uses: string; default: ModelChoice; providers: Provider[]; warnings: Record<string, string>;
+  current: ModelChoice; label: string;
+}
+export interface ProviderStatus { ready: boolean; models?: string[]; error?: string | null }
+export interface HermesModel {
+  current: { model?: string; provider?: string; baseUrl?: string; kind?: string } | null;
+  kinds: Record<string, string>; mode: 'mock' | 'hermes'; file: string; label: string | null;
+}
+export interface ModelsOverview {
+  agents: AgentModel[]; providers: Record<string, ProviderStatus>; providerNames: Record<string, string>;
+  suggestions: Record<string, string[]>; hermes: HermesModel;
 }

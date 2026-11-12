@@ -166,7 +166,7 @@ test('usage & costs shows each agent and the month', async ({ page }) => {
   await page.goto('/admin/usage');
   await expect(page.getByTestId('usage-agent')).toHaveCount(2);
   await expect(page.getByText('November 2026 to date')).toBeVisible();
-  await expect(page.getByText('not tracked yet')).toBeVisible();
+  await expect(page.getByText('no model calls logged yet')).toBeVisible();
   await page.goto('/admin/usage?agent=demo');
   await expect(page.getByTestId('usage-agent')).toHaveCount(1);
 });
@@ -219,4 +219,38 @@ test('plugins: warns when the installer is not set up', async ({ page }) => {
   await mockApi(page, { loggedIn: true, installerReady: false });
   await page.goto('/admin/plugins');
   await expect(page.getByText("The installer isn't set up on this machine yet.")).toBeVisible();
+});
+
+test('Model & tools: change Hermes\' model (with rollback) and an agent\'s model', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await page.goto('/admin/model');
+  await expect(page.getByTestId('models-table')).toContainText('anthropic/claude-sonnet-4.5 (OpenRouter)');
+  await expect(page.getByTestId('models-table')).toContainText('eu.claude (AWS Bedrock)');
+  const h = page.getByTestId('hermes-model-picker');
+  await expect(h.getByTestId('hermes-model-picker-openrouter')).toContainText('In use');
+  await h.getByTestId('hermes-model-picker-ollama').getByRole('radio').check();
+  await expect(h).toContainText('OLLAMA_CONTEXT_LENGTH');
+  await h.getByLabel('Local model (Ollama) model').fill('qwen3:14b');
+  await h.getByRole('button', { name: 'Save and restart Hermes' }).click();
+  await expect(h.getByRole('status')).toContainText('Hermes now uses qwen3:14b');
+  await expect(h.getByRole('status')).toContainText('Hermes answered with qwen3:14b');
+  await expect(page.getByTestId('models-table')).toContainText('qwen3:14b (Local model (Ollama))');
+  await h.getByTestId('hermes-model-picker-openrouter').getByRole('radio').check();
+  await h.getByLabel('OpenRouter model').fill('no/such-model');
+  await h.getByRole('button', { name: 'Save and restart Hermes' }).click();
+  await expect(h.getByRole('status')).toContainText('Not changed: model not found');
+  await expect(h.getByRole('status')).toContainText('Put the previous model back');
+
+  await page.getByTestId('models-table').getByRole('link', { name: 'Change' }).click();
+  await expect(page).toHaveURL(/\/admin\/model\?agent=demo/);
+  const a = page.getByTestId('agent-model');
+  await expect(a).toContainText("Demo agent's model");
+  await expect(a.getByTestId('agent-model-bedrock')).toContainText('Not set up');
+  await a.getByTestId('agent-model-openrouter').getByRole('radio').check();
+  await expect(a).toContainText('Demo text is sent to OpenRouter.');
+  await a.getByLabel('OpenRouter model').fill('qwen/qwen3-coder');
+  await a.getByRole('button', { name: 'Save as default' }).click();
+  await expect(a.getByRole('status')).toContainText('Demo agent now uses qwen/qwen3-coder (OpenRouter)');
+  await a.getByRole('button', { name: 'Test' }).click();
+  await expect(a.getByRole('status')).toContainText('answered “OK” in 812 ms');
 });

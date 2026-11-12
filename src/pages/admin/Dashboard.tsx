@@ -5,6 +5,7 @@ import type { AuditEvent, Conversation, Dashboard as DashboardData, Usage } from
 import { AdminIcon } from '../../components/AdminIcons';
 import { ChevronRightIcon, GearIcon } from '../../components/Icons';
 import type { AdminIconName } from '../../plugins/types';
+import { explain, who } from './events';
 import { PageHeader } from './PageHeader';
 import { ALL, hrefFor, useAgent, type Agent } from './agents';
 
@@ -215,7 +216,7 @@ function AgentDashboard({ agent }: { agent: Agent }) {
           {events?.map((e) => (
             <li key={e.id}>
               <span className="activity__time">{fmtTime(e.ts)}</span>
-              <span className="activity__chan">{e.action === 'mcp.call' ? 'Tool call' : e.actor}</span>
+              <span className="activity__chan">{e.action === 'mcp.call' ? 'Tool call' : who(e.actor)}</span>
               <span className="activity__text"><span>{describe(e)}</span></span>
             </li>
           ))}
@@ -225,9 +226,8 @@ function AgentDashboard({ agent }: { agent: Agent }) {
   );
 }
 
-/** "mcp.call kpi_get_scorecard" → "kpi_get_scorecard"; "content.draft.generate d12" → "draft generate · d12". */
+/** One line for a log entry (see events.ts: agents can describe their own entries in words). */
 export function describe(e: AuditEvent): string {
-  if (e.action === 'mcp.call') return `${e.target}${e.detail.error ? ' (failed)' : ''}`;
-  const what = e.action.split('.').slice(1).join(' ') || e.action;
-  return `${what}${e.target ? ` · ${e.target}` : ''}`;
+  const t = explain(e);
+  return `${t.what}${t.failed && !t.what.toLowerCase().includes('fail') ? ' (failed)' : ''}`;
 }

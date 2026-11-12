@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client';
-import type { HermesInfo } from '../../api/types';
+import type { HermesInfo, ModelsOverview } from '../../api/types';
+import { AgentModelPanel, HermesModelPanel, ModelsTable } from './ModelPicker';
 import { PageHeader } from './AdminLayout';
 import { ALL, useAgent } from './agents';
 
@@ -10,9 +11,11 @@ export function Hermes() {
   const [info, setInfo] = useState<HermesInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [models, setModels] = useState<ModelsOverview | null>(null);
   const load = useCallback(async () => {
     setError(null);
     try { setInfo(await api.hermes()); } catch (e) { setError((e as Error).message); }
+    try { setModels(await api.models()); } catch { /* older agent-api */ }
   }, []);
   useEffect(() => { void load(); }, [load]);
 
@@ -29,8 +32,10 @@ export function Hermes() {
           )}
         </>} />
       {error && <p className="form-error" role="alert">{error}</p>}
+      {agent.id === ALL && models && <><HermesModelPanel data={models} onSaved={() => void load()} /><ModelsTable data={models} /></>}
+      {agent.id !== ALL && models && <AgentModelPanel agentId={agent.id} data={models} onSaved={() => void load()} />}
       {agent.id !== ALL && agent.plugin?.modelPanel}
-      {agent.id !== ALL && agent.plugin?.modelPanel && <h2 className="panel__title" style={{ margin: '8px 0 12px' }}>Hermes (chat and tools)</h2>}
+      {agent.id !== ALL && <h2 className="panel__title" style={{ margin: '8px 0 12px' }}>Hermes (chat and tools)</h2>}
 
       {s && (
         <div className="stats">

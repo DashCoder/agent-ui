@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { AuditEvent } from '../api/types';
 
 /**
  * Version of the UI plugin contract. Bumped only for breaking changes; plugins list the versions they support.
@@ -66,4 +67,10 @@ export interface AgentUIPlugin {
   dashboard?: ReactNode;
   /** Version 2: shown at the top of Model & tools when this agent is picked, e.g. the agent's own model choice. */
   modelPanel?: ReactNode;
+  /** Version 2: a plain-language line for this agent's own log entries (Agent logs, dashboards). Return undefined
+   * to fall back to the default. */
+  describeEvent?: (e: AuditEvent) => EventText | undefined;
 }
+
+/** One log entry in words: what happened, an optional second line, and whether it was a failure. */
+export interface EventText { what: string; more?: string; failed?: boolean }

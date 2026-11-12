@@ -2,7 +2,8 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { AuditEvent, Conversation, ConversationMessage } from '../../api/types';
-import { StatusPill, describe, fmtTime } from './Dashboard';
+import { StatusPill, fmtTime } from './Dashboard';
+import { explain, who } from './events';
 import { PageHeader } from './PageHeader';
 import { ALL, useAgent } from './agents';
 
@@ -147,18 +148,24 @@ function Actions({ agentId, name }: { agentId: string; name: string }) {
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="tbl-wrap">
         <table className="tbl" style={{ minWidth: 640 }}>
-          <thead><tr><th scope="col">Time</th><th scope="col">Who</th><th scope="col">What</th><th scope="col">Details</th></tr></thead>
+          <colgroup><col style={{ width: 112 }} /><col style={{ width: 90 }} /><col /></colgroup>
+          <thead><tr><th scope="col">Time</th><th scope="col">Who</th><th scope="col">What happened</th></tr></thead>
           <tbody>
-            {items?.map((e) => (
-              <tr key={e.id} data-testid="audit-row">
-                <td style={{ whiteSpace: 'nowrap' }}>{fmtTime(e.ts)}</td>
-                <td>{e.actor}</td>
-                <td>{e.action === 'mcp.call' ? <span className="status status--accent">Tool call</span> : e.action}<div className="small" style={{ marginTop: 2 }}>{describe(e)}</div></td>
-                <td className="muted" style={{ overflowWrap: 'anywhere' }}>
-                  {Object.entries(e.detail).filter(([k]) => k !== 'plugin').map(([k, v]) => `${k}: ${String(v)}`).join(' · ')}
-                </td>
-              </tr>
-            ))}
+            {items?.map((e) => {
+              const t = explain(e);
+              return (
+                <tr key={e.id} data-testid="audit-row" className={t.failed ? 'row--failed' : undefined}>
+                  <td style={{ whiteSpace: 'nowrap' }}>{fmtTime(e.ts)}</td>
+                  <td>{who(e.actor)}</td>
+                  <td style={{ overflowWrap: 'anywhere' }}>
+                    {e.action === 'mcp.call' && <span className="status status--accent" style={{ marginRight: 6 }}>Tool call</span>}
+                    {t.failed && <span className="status status--bad" style={{ marginRight: 6 }}>Failed</span>}
+                    <span className="log__what">{t.what}</span>
+                    {t.more && <div className="small muted" style={{ marginTop: 2 }}>{t.more}</div>}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -64,7 +64,8 @@ export function UsagePage() {
           <h2 className="panel__title" style={{ marginBottom: 4 }}>{monthLabel(data.currentMonth)} to date</h2>
           <p className="page-head__sub" style={{ margin: '0 0 14px' }}>All of {who.toLowerCase() === 'your agents' ? 'your agents’' : `${who}’s`} activity this month.</p>
           <dl className="usage-grid">
-            <div><dt>Est. AI cost</dt><dd>{data.costTracked ? '' : '—'}</dd><dd>not tracked yet</dd></div>
+            <div><dt>AI cost</dt><dd>{data.costTracked ? `$${(month.cost ?? 0).toFixed(2)}` : '—'}</dd>
+              <dd>{data.costTracked ? `${num(month.modelCalls ?? 0)} model calls` : 'no model calls logged yet'}</dd></div>
             <div><dt>Messages</dt><dd>{num(month.messages)}</dd><dd>{num(month.conversations)} conversations</dd></div>
             <div><dt>Tool calls</dt><dd>{num(month.toolCalls)}</dd></div>
             <div><dt>Actions</dt><dd>{num(month.actions)}</dd></div>
@@ -95,9 +96,9 @@ export function UsagePage() {
 
       <p className="muted small" style={{ margin: 0 }}>
         Messages are what visitors typed to the chat assistant. Tool calls are what Hermes, Copilot and Claude asked an
-        agent to do; actions are what an agent recorded itself (drafts, approvals, logins). Model costs aren't tracked
-        on this machine yet: agents on the local model (Kai) cost nothing; Claude or OpenRouter usage shows on those
-        providers' own billing pages.
+        agent to do; actions are what an agent recorded itself (drafts, approvals, logins). AI cost adds up what
+        OpenRouter reported for each model call made through Model &amp; tools; local models cost nothing; Bedrock and
+        Hermes' own model calls show on those providers' billing pages.
       </p>
     </>
   );
@@ -112,5 +113,6 @@ function line(c: UsageCounts) {
 
 function sum(list: UsageCounts[]): UsageCounts {
   return list.reduce((t, c) => ({ messages: t.messages + c.messages, conversations: t.conversations + c.conversations,
-    toolCalls: t.toolCalls + c.toolCalls, actions: t.actions + c.actions }), { messages: 0, conversations: 0, toolCalls: 0, actions: 0 });
+    toolCalls: t.toolCalls + c.toolCalls, actions: t.actions + c.actions, modelCalls: (t.modelCalls ?? 0) + (c.modelCalls ?? 0),
+    cost: (t.cost ?? 0) + (c.cost ?? 0) }), { messages: 0, conversations: 0, toolCalls: 0, actions: 0, modelCalls: 0, cost: 0 });
 }

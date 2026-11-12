@@ -1,6 +1,6 @@
 import type {
   Approval, AuditEvent, ChatMessage, Dashboard, HermesInfo, KnowledgeItem, SavedReply, SiteConfig, SiteSettings,
-  StreamEvent, User, Conversation, ConversationMessage, Usage, PluginList, PluginCheck, PluginJob,
+  StreamEvent, User, Conversation, ConversationMessage, Usage, PluginList, PluginCheck, PluginJob, ModelsOverview, ModelChoice, HermesModel,
 } from './types';
 
 /** Base URL of agent-api. Empty = same origin (Vite dev proxy or Caddy in production). */
@@ -110,6 +110,12 @@ export const api = {
       Object.entries(q).filter(([, v]) => v !== undefined && v !== 0).map(([k, v]) => [k, String(v)]))}`),
   conversation: (id: string) => request<{ messages: ConversationMessage[] }>(`/api/admin/conversations/${id}`),
   usage: (agent = 'all') => request<Usage>(`/api/admin/usage?agent=${encodeURIComponent(agent)}`),
+  models: () => request<ModelsOverview>('/api/admin/models'),
+  saveModel: (agent: string, provider: string, model: string) =>
+    request<{ current?: ModelChoice; label?: string; ok?: boolean; steps?: string[]; error?: string; hermes?: HermesModel }>(
+      `/api/admin/models/${encodeURIComponent(agent)}`, { method: 'PUT', body: json({ provider, model }) }),
+  testModel: (agent: string) =>
+    request<{ ok: boolean; reply?: string; ms?: number; error?: string }>(`/api/admin/models/${encodeURIComponent(agent)}/test`, { method: 'POST' }),
   plugins: () => request<PluginList>('/api/admin/plugins'),
   checkPlugin: (url: string, ref: string) =>
     request<PluginCheck>('/api/admin/plugins/check', { method: 'POST', body: json({ url, ref }) }),

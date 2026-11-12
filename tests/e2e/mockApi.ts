@@ -15,6 +15,8 @@ export interface MockState {
   installerReady: boolean;
   /** Messages in the chat, oldest first (for removing a question and its answer). */
   log: { id: string; role: string }[];
+  models: any[];
+  hermes: any;
 }
 
 export const SITE = {
@@ -35,6 +37,12 @@ function sse(events: object[]) {
 export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promise<MockState> {
   const state: MockState = {
     loggedIn: false, saved: [], knowledge: [], jobs: [], installerReady: true, log: [],
+    models: [{ id: 'demo', name: 'Demo agent', uses: 'Writes demo things', default: { provider: 'bedrock', model: 'eu.claude' },
+               providers: ['ollama', 'openrouter', 'bedrock'], warnings: { openrouter: 'Demo text is sent to OpenRouter.' },
+               current: { provider: 'bedrock', model: 'eu.claude' }, label: 'eu.claude (AWS Bedrock)' }],
+    hermes: { current: { model: 'anthropic/claude-sonnet-4.5', provider: 'openrouter', kind: 'openrouter' },
+              kinds: { openrouter: 'OpenRouter', ollama: 'Local model (Ollama)', anthropic: 'Anthropic (Claude API)', bedrock: 'Claude on AWS Bedrock' },
+              mode: 'hermes', file: '/Users/aiagents/.hermes/config.yaml', label: 'anthropic/claude-sonnet-4.5 (OpenRouter)' },
     plugins: [
       { key: 'demo', repo: 'demo-agent', plugin: 'demo', title: 'Demo agent', url: '', ref: '', commit: '', builtin: true,
         installed: true, enabled: true, running: true, version: '1.0.0' },
@@ -169,6 +177,24 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
         .filter((a) => ['all', null, a.id].includes(url.searchParams.get('agent')));
       return json(route, { agents, currentMonth: '2026-11', costTracked: false,
         history: [{ month: '2026-11', ...c(20, 13) }, { month: '2026-10', ...c(8, 4) }] });
+    }
+    if (path === '/api/admin/models' && method === 'GET') return json(route, {
+      agents: state.models, providerNames: { ollama: 'Local model (Ollama)', openrouter: 'OpenRouter', bedrock: 'Claude on AWS Bedrock' },
+      providers: { ollama: { ready: true, models: ['qwen3:14b', 'qwen3:8b'] }, openrouter: { ready: true }, bedrock: { ready: false, error: "Bedrock keys aren't set in agent-api's .env" } },
+      suggestions: { ollama: ['qwen3:14b'], openrouter: ['anthropic/claude-sonnet-4.5', 'qwen/qwen3-coder'], bedrock: ['eu.anthropic.claude-sonnet-4-5-20250929-v1:0'] },
+      hermes: state.hermes });
+    const mm = path.match(/^\/api\/admin\/models\/(\w+)(\/test)?$/);
+    if (mm && mm[2]) return json(route, { ok: true, reply: 'OK', ms: 812 });
+    if (mm && method === 'PUT') {
+      const label = (p: string, m: string) => `${m} (${p === 'ollama' ? 'local, Ollama' : p === 'openrouter' ? 'OpenRouter' : 'AWS Bedrock'})`;
+      if (mm[1] === 'hermes') {
+        if (body.model === 'no/such-model') return json(route, { ok: false, error: 'model not found', steps: ['Saved', 'Restarted Hermes', "Hermes didn't answer (model not found). Put the previous model back and restarted Hermes."], hermes: state.hermes });
+        state.hermes = { ...state.hermes, current: { model: body.model, provider: body.provider === 'ollama' ? 'custom' : body.provider, kind: body.provider }, label: `${body.model} (${state.hermes.kinds[body.provider]})` };
+        return json(route, { ok: true, steps: ['Saved in ~/.hermes/config.yaml; backup config.yaml.bak-1', 'Restarted Hermes', `Hermes answered with ${body.model}: “OK”`], hermes: state.hermes });
+      }
+      const a = state.models.find((x: any) => x.id === mm[1]);
+      a.current = { provider: body.provider, model: body.model }; a.label = label(body.provider, body.model);
+      return json(route, { current: a.current, label: a.label });
     }
     if (path === '/api/admin/plugins') return json(route, { plugins: state.plugins, jobs: state.jobs,
       sources: ['github.com/DashCoder'], installerReady: state.installerReady });

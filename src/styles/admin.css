@@ -255,3 +255,18 @@
 
 .chip--suggest { border-style: dashed; cursor: pointer; background: #fff; }
 .chip--suggest:hover { border-color: var(--adm-accent); color: var(--adm-accent); }
+
+.log__what { font-weight: 500; }
+.row--failed td { background: rgba(197, 15, 31, 0.03); }
+
+/* model and engine pickers (Model & tools) */
+.engines { display: grid; gap: 10px; }
+.engine { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--adm-border, #E1E4E8);
+  border-radius: 8px; cursor: pointer; background: #fff; }
+.engine--on { border-color: var(--adm-accent); box-shadow: 0 0 0 1px var(--adm-accent); }
+.engine input[type=radio] { width: auto; margin-top: 4px; }
+.engine__body { display: grid; gap: 6px; flex: 1; min-width: 0; }
+.engine__title { font-weight: 600; font-size: 15px; display: flex; flex-wrap: wrap; align-items: center; }
+.engine__text { display: grid; gap: 6px; font-size: 13px; color: var(--adm-text-2); }
+.engine__field input { max-width: 380px; }
+.engine__warn { color: var(--adm-warn); }
