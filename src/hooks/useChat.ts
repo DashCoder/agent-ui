@@ -23,6 +23,8 @@ export interface ChatState {
   answerApproval: (approve: boolean) => Promise<void>;
   stop: () => void;
   reset: () => Promise<void>;
+  /** Remove a question and its answer (or just an answer) from the conversation. */
+  remove: (id: string) => Promise<void>;
 }
 
 /**
@@ -145,5 +147,13 @@ export function useChat(ready = true): ChatState {
     await startNew();
   }, [startNew]);
 
-  return { messages, draft, streaming, progress, approval, error, send, answerApproval, stop, reset };
+  const remove = useCallback(async (id: string) => {
+    if (!sessionId) return;
+    try {
+      const { removed } = await api.deleteMessage(sessionId, id);
+      setMessages((m) => m.filter((x) => !removed.includes(x.id)));
+    } catch (e) { setError((e as Error).message); }
+  }, [sessionId]);
+
+  return { messages, draft, streaming, progress, approval, error, send, answerApproval, stop, reset, remove };
 }

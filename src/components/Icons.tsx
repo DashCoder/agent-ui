@@ -15,6 +15,10 @@ export const ChevronRightIcon = (p: P) => <svg {...base} {...p}><path d="M9 6l6 
 export const SaveIcon = (p: P) => (
   <svg {...base} {...p}><path d="M5 3h11l3 3v15H5z" /><path d="M8 3v5h7V3M8 21v-7h8v7" /></svg>
 );
+export const TrashIcon = (p: P) => (
+  <svg {...base} {...p}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>
+);
+export const GripIcon = (p: P) => <svg {...base} {...p}><path d="M8 10h8M8 14h8" /></svg>;
 export const CloseIcon = (p: P) => <svg {...base} {...p}><path d="M6 6l12 12M18 6L6 18" /></svg>;
 export const PaperclipIcon = (p: P) => (
   <svg {...base} {...p}><path d="M21 11.5l-8.5 8.5a5 5 0 01-7-7L14 4.5a3.5 3.5 0 015 5L10.5 18a2 2 0 01-3-3l8-8" /></svg>

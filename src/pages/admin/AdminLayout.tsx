@@ -1,81 +1,124 @@
-import { useEffect, useState } from 'react';
-import { PLUGIN_ADMIN_PAGES } from '../../plugins';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
+import { AdminIcon } from '../../components/AdminIcons';
 import { BrandMark } from '../../components/Icons';
 import { useSiteConfig } from '../../hooks/useSiteConfig';
+import { AgentContext, ALL, agentFor, buildAgents, hrefFor, switchTo, type Agent } from './agents';
 
-/** Sidebar entries. Add a page: create it, add a route in App.tsx and an entry here. */
-export const NAV = [
-  { to: '/admin', label: 'Dashboard', icon: '🏠', end: true },
-  { to: '/admin/builder', label: 'Builder', icon: '💬' },
-  { to: '/admin/avatar', label: 'Avatar', icon: '🐾' },
-  { to: '/admin/phone', label: 'Phone', icon: '📞' },
-  { to: '/admin/calendar', label: 'Calendar', icon: '📅' },
-  { to: '/admin/knowledge', label: 'Knowledge', icon: '📚' },
-  { to: '/admin/hermes', label: 'Hermes', icon: '🤖' },
-  { to: '/admin/audit', label: 'Audit', icon: '📜' },
-  { to: '/admin/settings', label: 'Settings', icon: '⚙️' },
-];
-
-type NavItem = { to: string; label: string; icon: string; end?: boolean };
-
-/** Core pages plus plugin pages, each plugin page placed after the page it names (default: before Settings). */
-export function navItems(): NavItem[] {
-  const items: NavItem[] = [...NAV];
-  for (const pg of PLUGIN_ADMIN_PAGES) {
-    const item = { to: `/admin/${pg.path}`, label: pg.label, icon: pg.icon };
-    const anchor = pg.after === undefined ? -1 : items.findIndex((n) => n.to === (pg.after ? `/admin/${pg.after}` : '/admin'));
-    if (anchor >= 0) items.splice(anchor + 1, 0, item);
-    else items.splice(items.length - 1, 0, item);
-  }
-  return items;
-}
-
+/**
+ * The admin harness (DogRun Command look): dark top bar, light left menu with line icons and section headings, an
+ * Agent dropdown that swaps the menu for that agent's own, and white panels on a grey canvas.
+ */
 export function AdminLayout() {
   const { config } = useSiteConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading');
+  const [collapsed, setCollapsed] = useState(false);
+  const [badges, setBadges] = useState<Record<string, number>>({});
+  const { all, agents } = useMemo(() => buildAgents(), []);
+  const agentId = agentFor(location.pathname, location.search, agents);
+  const agent: Agent = agents.find((a) => a.id === agentId) ?? all;
 
   useEffect(() => {
     api.me()
       .then(({ user }) => {
         if (user?.role === 'admin') setState('ok');
-        else navigate(`/login?next=${encodeURIComponent(location.pathname)}`, { replace: true });
+        else navigate(`/login?next=${encodeURIComponent(location.pathname + location.search)}`, { replace: true });
       })
       .catch(() => setState('error'));
-  }, [navigate, location.pathname]);
+  }, [navigate, location.pathname, location.search]);
+
+  // Start collapsed on narrow screens so content keeps most of the width.
+  useEffect(() => { if (window.matchMedia('(max-width: 760px)').matches) setCollapsed(true); }, []);
+
+  // Counts on menu items (e.g. emails waiting for review), refreshed when the agent changes.
+  useEffect(() => {
+    if (state !== 'ok') return;
+    let live = true;
+    for (const item of agent.menu.flatMap((s) => s.items)) {
+      if (!item.badge) continue;
+      item.badge().then((n) => live && setBadges((b) => ({ ...b, [`${agent.id}:${item.to}`]: n }))).catch(() => {});
+    }
+    return () => { live = false; };
+  }, [agent, state]);
 
   const logout = async () => {
     await api.logout().catch(() => {});
     navigate('/login');
   };
 
+  const isActive = (href: string) => {
+    if (agent.id === ALL && href.includes('?agent=')) return false; // links in "Agents" open another agent
+    return location.pathname.replace(/\/$/, '') === href.split('?')[0];
+  };
+  const host = config.brand.adminTitle || window.location.host;
+  const product = config.brand.consoleName || 'InAgentic Command';
+
   return (
-    <div className="admin-theme admin">
-      <header className="admin__top">
-        <Link to="/admin" className="admin__brand"><BrandMark /> {config.brand.adminTitle}</Link>
-        <div className="admin__top-links">
-          <button type="button" className="linklike" onClick={() => void logout()}>Sign out</button>
-          <Link to={config.brand.landingUrl || '/'} className="admin__landing">← Landing page</Link>
+    <AgentContext.Provider value={{ agent, agents }}>
+      <div className="admin-theme cmd">
+        <header className="cmd__top">
+          <Link to="/admin" className="cmd__brand">
+            <BrandMark width={26} height={26} />
+            <span className="cmd__product">{product}</span>
+            <span className="cmd__host">{host}</span>
+          </Link>
+          <span className="cmd__spacer" />
+          <button type="button" className="cmd__toplink" onClick={() => void logout()}>Sign out</button>
+          <a href={config.brand.landingUrl || '/'} className="cmd__toplink">View site ↗</a>
+        </header>
+        <div className="cmd__body">
+          <aside className={`cmd__side ${collapsed ? 'cmd__side--collapsed' : ''}`}>
+            <button type="button" className="cmd__burger" onClick={() => setCollapsed((c) => !c)}
+                    aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'} aria-expanded={!collapsed}>
+              <svg viewBox="0 0 20 20" width={20} height={20} aria-hidden="true">
+                <path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+              </svg>
+            </button>
+            {!collapsed && agents.length > 0 && (
+              <div className="cmd__agent">
+                <label htmlFor="agent-switcher">Agent</label>
+                <select id="agent-switcher" value={agent.id} onChange={(e) => navigate(switchTo(location.pathname, e.target.value))}>
+                  <option value={ALL}>All agents</option>
+                  {agents.map((a) => <option key={a.id} value={a.id}>{a.name} — {a.id}</option>)}
+                </select>
+              </div>
+            )}
+            <nav aria-label="Admin sections" className="cmd__nav">
+              {agent.menu.filter((s) => s.items.length).map((section, i) => (
+                <div key={section.title ?? `top-${i}`} role="group" aria-label={section.title}>
+                  {section.title && (collapsed ? <hr className="cmd__rule" aria-hidden /> : <p className="cmd__navhead">{section.title}</p>)}
+                  {section.items.map((item) => {
+                    const href = hrefFor(item, agent.id);
+                    const active = isActive(href);
+                    const badge = badges[`${agent.id}:${item.to}`];
+                    return (
+                      <Link key={item.to + item.label} to={href} className="cmd__item" aria-current={active ? 'page' : undefined}
+                            title={collapsed ? item.label : undefined}>
+                        {active && <span className="cmd__bar" aria-hidden />}
+                        <AdminIcon name={item.icon} />
+                        {!collapsed && <span className="cmd__label">{item.label}</span>}
+                        {!!badge && <span className={`cmd__badge ${collapsed ? 'cmd__badge--dot' : ''}`}>{badge}</span>}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ))}
+            </nav>
+          </aside>
+          <main className="cmd__main">
+            <div className="cmd__content">
+              {state === 'ok' && <Outlet />}
+              {state === 'loading' && <p className="muted">Loading…</p>}
+              {state === 'error' && <p className="form-error" role="alert">Can't reach agent-api. Is it running on port 8000?</p>}
+              <p className="cmd__footer">{product} · {host} · Powered by agent-api</p>
+            </div>
+          </main>
         </div>
-      </header>
-      <div className="admin__body">
-        <nav className="admin__nav" aria-label="Admin">
-          {navItems().map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} className="navbtn">
-              <span className="navbtn__icon" aria-hidden>{n.icon}</span>{n.label}
-            </NavLink>
-          ))}
-        </nav>
-        <main className="admin__main">
-          {state === 'ok' && <Outlet />}
-          {state === 'loading' && <p className="muted">Loading…</p>}
-          {state === 'error' && <p className="form-error" role="alert">Can't reach agent-api. Is it running on port 8000?</p>}
-        </main>
       </div>
-    </div>
+    </AgentContext.Provider>
   );
 }
 

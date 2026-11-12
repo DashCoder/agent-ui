@@ -18,7 +18,7 @@ export function Hermes() {
   const s = info?.status;
   return (
     <>
-      <PageHeader title="Hermes Agent" subtitle="Connection to the agent runtime on this machine."
+      <PageHeader title="Model &amp; tools" subtitle="Hermes, the agent runtime on this machine: its model, connection and the tools your agents use."
         actions={<>
           <button type="button" className="btn btn--soft" onClick={() => void load()}>↻ Check again</button>
           {info?.dashboardUrl && (

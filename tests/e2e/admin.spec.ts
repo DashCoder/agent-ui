@@ -1,5 +1,12 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { mockApi } from './mockApi';
+
+/** On phones the menu starts collapsed to icons; open it so labels and the Agent dropdown show. */
+async function openNav(page: Page) {
+  const expand = page.getByRole('button', { name: 'Expand navigation' });
+  if (await expand.isVisible()) await expand.click();
+  return page.getByRole('navigation', { name: 'Admin sections' });
+}
 
 test.describe('admin console', () => {
   test('redirects to login, rejects a wrong password, then shows the dashboard', async ({ page }) => {
@@ -11,21 +18,71 @@ test.describe('admin console', () => {
     await expect(page.getByRole('alert')).toHaveText('Wrong username or password');
     await page.getByLabel('Password').fill('secret');
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /Dashboard/ })).toBeVisible();
     await expect(page.getByText('Getting started')).toBeVisible();
-    for (const id of ['phone', 'knowledge', 'calendar', 'widget']) await expect(page.getByTestId(`step-${id}`)).toBeVisible();
-    await expect(page.getByRole('link', { name: '← Landing page' })).toBeVisible();
+    for (const id of ['phone', 'knowledge', 'calendar', 'widget', 'model']) await expect(page.getByTestId(`step-${id}`)).toBeVisible();
+    await expect(page.getByText('InAgentic Command').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'View site ↗' })).toBeVisible();
+    await expect(page.getByText('What are your rates?')).toBeVisible();   // recent conversations
   });
 
-  test('sidebar navigation reaches every page', async ({ page }) => {
+  test('the menu reaches every core page', async ({ page }) => {
     await mockApi(page, { loggedIn: true });
     await page.goto('/admin');
-    const nav = page.getByRole('navigation', { name: 'Admin' });
-    for (const [label, heading] of [['Builder', 'Builder'], ['Avatar', 'Avatar'], ['Phone', 'Phone'],
-      ['Calendar', 'Calendar'], ['Knowledge', 'Knowledge'], ['Hermes', 'Hermes Agent'], ['Settings', 'Settings']]) {
-      await nav.getByRole('link', { name: label }).click();
+    const nav = await openNav(page);
+    for (const [label, heading] of [['Agent', 'Agent'], ['Avatar', 'Avatar'], ['Knowledge', 'Knowledge'],
+      ['Model & tools', 'Model & tools'], ['Phone', 'Phone'], ['Calendar', 'Calendar'], ['Agent logs', 'Agent logs'],
+      ['Usage & costs', 'Usage & costs'], ['Plugins', 'Plugins'], ['Settings', 'Settings']]) {
+      await nav.getByRole('link', { name: label, exact: true }).click();
       await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
+      await expect(nav.getByRole('link', { name: label, exact: true })).toHaveAttribute('aria-current', 'page');
     }
+  });
+
+  test('old addresses still work', async ({ page }) => {
+    await mockApi(page, { loggedIn: true });
+    for (const [old, now] of [['builder', 'agent'], ['hermes', 'model'], ['audit', 'logs']]) {
+      await page.goto(`/admin/${old}`);
+      await expect(page).toHaveURL(new RegExp(`/admin/${now}`));
+    }
+  });
+
+  test('the Agent dropdown swaps the menu for that agent, with its badge', async ({ page }) => {
+    await mockApi(page, { loggedIn: true });
+    await page.goto('/admin');
+    await openNav(page);
+    const pick = page.getByLabel('Agent', { exact: true });
+    await expect(pick.locator('option')).toHaveText(['All agents', 'Demo agent — demo', 'Legacy — legacy']);
+    await pick.selectOption('demo');
+    await expect(page).toHaveURL(/\/admin\?agent=demo$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Demo agent' })).toBeVisible();
+    const nav = page.getByRole('navigation', { name: 'Admin sections' });
+    await expect(nav.getByRole('link', { name: /^Demo\s*3$/ })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Phone' })).toHaveCount(0);       // not on this agent's menu
+    await expect(nav.getByRole('link', { name: 'Knowledge' })).toHaveAttribute('href', '/admin/knowledge?agent=demo');
+    await nav.getByRole('link', { name: /^Demo/ }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Demo plugin' })).toBeVisible();
+    await page.getByRole('button', { name: 'Clicked 0' }).click();
+    await expect(page.getByRole('button', { name: 'Clicked 1' })).toBeVisible();
+    await expect(pick).toHaveValue('demo');                                       // the page's owner stays picked
+    // shared pages keep the agent when switching
+    await nav.getByRole('link', { name: 'Agent logs' }).click();
+    await pick.selectOption('all');
+    await expect(page).toHaveURL(/\/admin\/logs$/);
+    await expect(page.getByRole('tab', { name: 'Conversations' })).toBeVisible();
+  });
+
+  test('an API 1 plugin gets a default menu; incompatible plugins are skipped', async ({ page }) => {
+    await mockApi(page, { loggedIn: true });
+    await page.goto('/admin?agent=legacy');
+    const nav = await openNav(page);
+    await expect(nav.getByRole('link', { name: 'Legacy page' })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Plugins' })).toBeVisible();
+    await nav.getByRole('link', { name: 'Legacy page' }).click();
+    await expect(page.getByText('Old style')).toBeVisible();
+    await page.goto('/admin');
+    await openNav(page);
+    await expect(page.getByLabel('Agent', { exact: true }).locator('option', { hasText: 'Future' })).toHaveCount(0);
   });
 
   test('adding a phone number completes the checklist step', async ({ page }) => {
@@ -34,31 +91,44 @@ test.describe('admin console', () => {
     await page.getByLabel('Phone number').fill('+44 20 1234 5678');
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByRole('status')).toHaveText('Saved');
-    await page.getByRole('navigation', { name: 'Admin' }).getByRole('link', { name: 'Dashboard' }).click();
-    await expect(page.getByTestId('step-phone')).toContainText('✓');
+    await (await openNav(page)).getByRole('link', { name: 'Dashboard' }).click();
+    await expect(page.getByTestId('step-phone')).toHaveClass(/step--done/);
   });
 
-  test('settings change the assistant name shown in chat', async ({ page }) => {
+  test('the Agent page changes the assistant name shown in chat', async ({ page }) => {
     await mockApi(page, { loggedIn: true });
-    await page.goto('/admin/settings');
-    await page.getByLabel('Name', { exact: true }).fill('Ava');
-    await page.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByRole('status')).toHaveText('Saved');
+    await page.goto('/admin/agent');
+    const name = page.getByLabel('Name', { exact: true });
+    await expect(name).toHaveValue('Builder');   // settings loaded
+    await name.fill('Ava');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByRole('status').first()).toHaveText('✓ Saved');
     await page.goto('/');
     await expect(page.getByPlaceholder('Ask Ava anything…')).toBeVisible();
+  });
+
+  test('quick replies: add one suggested by an installed agent', async ({ page }) => {
+    await mockApi(page, { loggedIn: true });
+    await page.goto('/admin/agent');
+    const sugg = page.getByTestId('pill-suggestions');
+    await expect(sugg.getByRole('button', { name: '+ What are your rates?' })).toHaveCount(0);   // already a quick reply
+    await sugg.getByRole('button', { name: '+ List my last 5 Jira tickets' }).click();
+    await expect(page.getByTestId('pills')).toContainText('List my last 5 Jira tickets');
+    await expect(page.getByTestId('pill-suggestions')).toHaveCount(0);
+    await expect(page.locator('.builder-frame').getByRole('button', { name: 'List my last 5 Jira tickets' })).toBeVisible();
   });
 
   test('knowledge sources can be added', async ({ page }) => {
     await mockApi(page, { loggedIn: true });
     await page.goto('/admin/knowledge');
     await page.getByLabel('URL').fill('https://example.com/faq');
-    await page.getByRole('button', { name: 'Add' }).click();
-    await expect(page.getByText('https://example.com/faq')).toBeVisible();
+    await page.getByRole('button', { name: 'Add link' }).click();
+    await expect(page.getByRole('link', { name: 'https://example.com/faq' })).toBeVisible();
   });
 
-  test('Hermes page shows status and the dashboard link', async ({ page }) => {
+  test('Model & tools shows status and the dashboard link', async ({ page }) => {
     await mockApi(page, { loggedIn: true });
-    await page.goto('/admin/hermes');
+    await page.goto('/admin/model');
     await expect(page.getByText('hermes-agent', { exact: true })).toBeVisible();
     await expect(page.getByText('book-appointment')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Open full Hermes dashboard ↗' }))
@@ -77,23 +147,75 @@ test('avatar page lets the admin pick and test a natural voice', async ({ page }
   await expect(page.getByRole('status')).toHaveText('Saved');
 });
 
-test('plugin pages appear in the sidebar after the page they name; incompatible plugins are skipped', async ({ page }) => {
+test('agent logs: conversations open into a transcript; actions per agent', async ({ page }) => {
   await mockApi(page, { loggedIn: true });
-  await page.goto('/admin');
-  const nav = page.getByRole('navigation', { name: 'Admin' });
-  const labels = await nav.getByRole('link').allInnerTexts();
-  const clean = labels.map((l) => l.replace(/^\W+\s*/u, '').trim());
-  expect(clean.indexOf('Demo')).toBe(clean.indexOf('Builder') + 1);
-  expect(clean).not.toContain('Future');
-  await nav.getByRole('link', { name: 'Demo' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Demo plugin' })).toBeVisible();
-  await page.getByRole('button', { name: 'Clicked 0' }).click();
-  await expect(page.getByRole('button', { name: 'Clicked 1' })).toBeVisible();
+  await page.goto('/admin/logs');
+  await expect(page.getByRole('heading', { level: 1, name: 'Agent logs' })).toBeVisible();
+  await page.getByRole('button', { name: 'What are your rates?' }).click();
+  await expect(page.getByTestId('transcript')).toContainText('Plans start at £49 per month.');
+  await page.getByRole('tab', { name: 'Actions' }).click();
+  await expect(page.getByTestId('audit-row')).toHaveCount(2);
+  await page.goto('/admin/logs?agent=demo');
+  await expect(page.getByRole('tab')).toHaveCount(0);           // one agent: its actions only
+  await expect(page.getByTestId('audit-row').first()).toContainText('Tool call');
 });
 
-test('the audit page lists events', async ({ page }) => {
+test('usage & costs shows each agent and the month', async ({ page }) => {
   await mockApi(page, { loggedIn: true });
-  await page.goto('/admin/audit');
-  await expect(page.getByRole('heading', { level: 1, name: 'Audit trail' })).toBeVisible();
-  await expect(page.getByTestId('audit-row')).toHaveCount(1);
+  await page.goto('/admin/usage');
+  await expect(page.getByTestId('usage-agent')).toHaveCount(2);
+  await expect(page.getByText('November 2026 to date')).toBeVisible();
+  await expect(page.getByText('not tracked yet')).toBeVisible();
+  await page.goto('/admin/usage?agent=demo');
+  await expect(page.getByTestId('usage-agent')).toHaveCount(1);
+});
+
+test('plugins: check a repo, install it with its settings, follow the job', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await page.goto('/admin/plugins');
+  await expect(page.getByTestId('plugin-row')).toHaveCount(2);
+  await expect(page.getByTestId('plugin-row').nth(1)).toContainText('From git');
+
+  await page.getByLabel('Git repo URL').fill('https://github.com/someone/else');
+  await page.getByRole('button', { name: 'Check repo' }).click();
+  await expect(page.getByRole('alert')).toContainText('only come from');
+
+  await page.getByLabel('Git repo URL').fill('https://github.com/DashCoder/ina-sales-agent');
+  await page.getByRole('button', { name: 'Check repo' }).click();
+  const card = page.getByTestId('plugin-check');
+  await expect(card).toContainText('Sam');
+  await expect(card).toContainText('9f8e7d6');
+  await expect(card).toContainText('Add pipeline view');
+  const install = page.getByRole('button', { name: 'Install Sam @9f8e7d6' });
+  await expect(install).toBeDisabled();
+  await page.getByLabel('CRM token *').fill('tok');
+  await expect(install).toBeDisabled();                         // still needs the trust box
+  await page.getByLabel(/I trust this code/).check();
+  await install.click();
+  const job = page.getByTestId('plugin-job');
+  await expect(job).toContainText('Install Sam');
+  await expect(job).toContainText('Done', { timeout: 10_000 });
+  await expect(job).toContainText('Backup: 2026-11-12_101500');
+  await expect(page.getByTestId('plugin-row')).toHaveCount(3);
+  await expect(page.getByRole('cell', { name: /Install Sam/ })).toBeVisible();
+});
+
+test('plugins: turn one on, and removing asks to confirm', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  await page.goto('/admin/plugins');
+  const mine = page.getByTestId('plugin-row').filter({ hasText: 'My extension' });
+  await mine.getByRole('button', { name: 'Turn on' }).click();
+  await expect(page.getByTestId('plugin-job')).toContainText('Done', { timeout: 10_000 });
+  await expect(mine).toContainText('Running');
+  await page.getByRole('button', { name: 'Close' }).click();
+  await mine.getByRole('button', { name: 'Remove' }).click();
+  await mine.getByRole('button', { name: 'Confirm remove' }).click();
+  await expect(page.getByTestId('plugin-job')).toContainText('Done', { timeout: 10_000 });
+  await expect(page.getByTestId('plugin-row')).toHaveCount(1);
+});
+
+test('plugins: warns when the installer is not set up', async ({ page }) => {
+  await mockApi(page, { loggedIn: true, installerReady: false });
+  await page.goto('/admin/plugins');
+  await expect(page.getByText("The installer isn't set up on this machine yet.")).toBeVisible();
 });

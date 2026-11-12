@@ -1,6 +1,6 @@
 import type {
   Approval, AuditEvent, ChatMessage, Dashboard, HermesInfo, KnowledgeItem, SavedReply, SiteConfig, SiteSettings,
-  StreamEvent, User,
+  StreamEvent, User, Conversation, ConversationMessage, Usage, PluginList, PluginCheck, PluginJob,
 } from './types';
 
 /** Base URL of agent-api. Empty = same origin (Vite dev proxy or Caddy in production). */
@@ -54,6 +54,8 @@ export const api = {
 
   // chat
   createSession: () => request<{ id: string; messages: ChatMessage[] }>('/api/chat/sessions', { method: 'POST' }),
+  deleteMessage: (sessionId: string, id: string) =>
+    request<{ removed: string[] }>(`/api/chat/sessions/${sessionId}/messages/${id}`, { method: 'DELETE' }),
   messages: (sessionId: string) => request<{ messages: ChatMessage[] }>(`/api/chat/sessions/${sessionId}/messages`),
   async stream(sessionId: string, body: { text: string; learn: boolean; attachments: string[] },
                onEvent: (e: StreamEvent) => void, signal?: AbortSignal) {
@@ -101,6 +103,23 @@ export const api = {
   hermes: () => request<HermesInfo>('/api/admin/hermes'),
 
   auditLog: () => request<{ items: AuditEvent[] }>('/api/admin/audit'),
+  activity: (agent = 'all', limit = 200) =>
+    request<{ items: AuditEvent[] }>(`/api/admin/activity?agent=${encodeURIComponent(agent)}&limit=${limit}`),
+  conversations: (q: { offset?: number; limit?: number; since?: number; until?: number } = {}) =>
+    request<{ items: Conversation[]; hasMore: boolean }>(`/api/admin/conversations?${new URLSearchParams(
+      Object.entries(q).filter(([, v]) => v !== undefined && v !== 0).map(([k, v]) => [k, String(v)]))}`),
+  conversation: (id: string) => request<{ messages: ConversationMessage[] }>(`/api/admin/conversations/${id}`),
+  usage: (agent = 'all') => request<Usage>(`/api/admin/usage?agent=${encodeURIComponent(agent)}`),
+  plugins: () => request<PluginList>('/api/admin/plugins'),
+  checkPlugin: (url: string, ref: string) =>
+    request<PluginCheck>('/api/admin/plugins/check', { method: 'POST', body: json({ url, ref }) }),
+  installPlugin: (checkId: string, settings: Record<string, string>) =>
+    request<PluginJob>('/api/admin/plugins/install', { method: 'POST', body: json({ checkId, settings }) }),
+  togglePlugin: (key: string, enabled: boolean) =>
+    request<PluginJob>(`/api/admin/plugins/${encodeURIComponent(key)}/toggle`, { method: 'POST', body: json({ enabled }) }),
+  removePlugin: (key: string) =>
+    request<PluginJob>(`/api/admin/plugins/${encodeURIComponent(key)}/remove`, { method: 'POST' }),
+  pluginJob: (id: string) => request<PluginJob>(`/api/admin/plugins/jobs/${encodeURIComponent(id)}`),
 
   simliToken: () => request<{ sessionToken: string; maxSessionSeconds: number }>('/api/simli/token', { method: 'POST' }),
 

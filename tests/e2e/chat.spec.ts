@@ -139,3 +139,63 @@ test('links show as short labels and agent files become downloads', async ({ pag
   await expect(reply.locator('pre code')).toHaveText('print("hi")');
   await expect(reply).not.toContainText('/Users/aiagents');
 });
+
+test('replies read cleanly: lists, and tool names in plain words', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/');
+  await page.getByPlaceholder(/Ask .* anything/).fill('List your tools');
+  await page.getByRole('button', { name: 'Send' }).click();
+  const reply = page.getByTestId('msg-assistant').last();
+  await expect(reply.locator('ol li')).toHaveText(['Get Jira ticket: Reads a Jira ticket.', 'Propose pull request: Opens a pull request.']);
+  await expect(reply.locator('ul li')).toHaveCount(2);
+  await expect(reply).toContainText('the Inagentic tools');
+  await expect(reply).not.toContainText('mcp__');
+});
+
+test('remove one question and its answer, then clear the whole chat', async ({ page }) => {
+  const state = await mockApi(page);
+  await page.goto('/');
+  const box = page.getByPlaceholder(/Ask .* anything/);
+  for (const q of ['What are your rates?', 'Hello there']) {
+    await box.fill(q);
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect(page.getByTestId('msg-assistant')).toHaveCount(q === 'Hello there' ? 3 : 2);
+  }
+  const first = page.getByTestId('msg-user').filter({ hasText: 'What are your rates?' });
+  await first.hover();
+  await first.getByRole('button', { name: 'Remove this question and its answer' }).click();
+  await expect(page.getByTestId('msg-user')).toHaveText(['Hello there']);
+  await expect(page.getByText('Plans start at £49 per month.')).toHaveCount(0);
+  expect(state.log).toHaveLength(2);
+  await expect(page.getByTestId('msg-assistant').first().getByRole('button', { name: /Remove/ })).toHaveCount(0); // greeting stays
+  await page.getByRole('button', { name: 'Clear chat' }).click();
+  await page.getByRole('button', { name: 'Yes, clear' }).click();
+  await expect(page.getByTestId('msg-user')).toHaveCount(0);
+  await expect(page.getByTestId('msg-assistant')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Clear chat' })).toBeDisabled();
+});
+
+test('the conversation can be made taller, and the size is remembered', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/');
+  const t = page.getByTestId('transcript-box');
+  const before = (await t.boundingBox())!.height;
+  await page.getByRole('button', { name: 'Taller' }).click();
+  const tall = (await t.boundingBox())!.height;
+  expect(tall).toBeGreaterThan(before + 50);
+  await page.getByRole('button', { name: 'Normal size' }).click();
+  expect((await t.boundingBox())!.height).toBeLessThan(tall);
+  const handle = page.getByRole('separator', { name: /Resize the conversation/ });
+  const hb = (await handle.boundingBox())!;
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2 + 120, { steps: 5 });
+  await page.mouse.up();
+  const dragged = (await t.boundingBox())!.height;
+  expect(dragged).toBeGreaterThan(before + 80);
+  await handle.focus();
+  await page.keyboard.press('ArrowUp');
+  expect((await t.boundingBox())!.height).toBeLessThan(dragged);
+  await page.reload();
+  expect(Math.abs((await t.boundingBox())!.height - (dragged - 40))).toBeLessThan(3);
+});

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent, type RefObject } from 'react';
 import { api } from '../api/client';
 import type { SavedReply } from '../api/types';
 import { useChat } from '../hooks/useChat';
@@ -8,10 +8,49 @@ import { ApprovalCard } from './ApprovalCard';
 import { AvatarPanel } from './AvatarPanel';
 import type { AudioSink } from './SimliStage';
 import { Composer } from './Composer';
-import { ChevronDownIcon, ChevronUpIcon } from './Icons';
+import { ChevronDownIcon, ChevronUpIcon, ExpandIcon, GripIcon, TrashIcon } from './Icons';
 import { MessageBubble } from './MessageBubble';
 import { SavedReplies } from './SavedReplies';
 import { SaveWorkForm } from './SaveWorkForm';
+
+const HEIGHT_KEY = 'agent-ui.chatHeight';
+const MIN_H = 160;
+const maxH = () => Math.round(window.innerHeight * 0.85);
+const clampH = (h: number) => Math.max(MIN_H, Math.min(maxH(), Math.round(h)));
+function readHeight(): number | null {
+  try { const v = Number(localStorage.getItem(HEIGHT_KEY)); return v > 0 ? v : null; } catch { return null; }
+}
+function writeHeight(h: number | null) {
+  try { h ? localStorage.setItem(HEIGHT_KEY, String(h)) : localStorage.removeItem(HEIGHT_KEY); } catch { /* private mode */ }
+}
+
+/** The conversation's height: drag the bar under it, use the arrow keys on it, or "Taller" for most of the screen.
+ * Remembered in this browser. */
+function useTranscriptHeight(ref: RefObject<HTMLDivElement>) {
+  const [height, setHeightState] = useState<number | null>(() => readHeight());
+  const setHeight = useCallback((h: number | null) => {
+    const v = h === null ? null : clampH(h);
+    setHeightState(v); writeHeight(v);
+  }, []);
+  const startDrag = (e: RPointerEvent<HTMLButtonElement>) => {
+    const el = ref.current;
+    if (!el) return;
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = el.getBoundingClientRect().height;
+    const move = (ev: PointerEvent) => setHeight(startH + ev.clientY - startY);
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  const onKey = (e: KeyboardEvent) => {
+    const cur = height ?? ref.current?.getBoundingClientRect().height ?? 300;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHeight(cur + 40); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setHeight(cur - 40); }
+  };
+  const tall = height !== null && height >= maxH() - 4;
+  return { height, setHeight, startDrag, onKey, tall };
+}
 
 interface Props {
   /** Where saved replies render: beside the chat ("aside") or under it ("inline", used in admin). */
@@ -32,6 +71,8 @@ export function ChatExperience({ savedPlacement = 'aside' }: Props) {
   const [saveWorkOpen, setSaveWorkOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const size = useTranscriptHeight(scrollRef);
+  const [confirmClear, setConfirmClear] = useState(false);
   const lastSpoken = useRef<string | null>(null);
 
   useEffect(() => setLearn(config.assistant.learnByDefault), [config.assistant.learnByDefault]);
@@ -83,6 +124,13 @@ export function ChatExperience({ savedPlacement = 'aside' }: Props) {
     void chat.send(text, { learn, attachments });
   };
 
+  const clear = async () => {
+    setConfirmClear(false);
+    setNotice(null);
+    chat.stop();
+    await chat.reset();
+  };
+
   const talking = chat.streaming || speech.speaking;
   const savedPanel = <SavedReplies items={saved} onRemove={removeReply} onUse={copyReply} />;
 
@@ -98,11 +146,31 @@ export function ChatExperience({ savedPlacement = 'aside' }: Props) {
                   aria-label={avatarOpen ? 'Hide avatar' : 'Show avatar'} aria-expanded={avatarOpen}>
             {avatarOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
           </button>
-          <div className="transcript" ref={scrollRef} aria-live="polite">
-            {chat.messages.map((m) => (
+          <div className="transcript-bar">
+            {confirmClear ? (
+              <>
+                <span className="transcript-bar__confirm">Clear the whole conversation?</span>
+                <button type="button" className="transcript-bar__btn transcript-bar__btn--danger" onClick={() => void clear()}>
+                  Yes, clear</button>
+                <button type="button" className="transcript-bar__btn" onClick={() => setConfirmClear(false)}>Cancel</button>
+              </>
+            ) : (
+              <button type="button" className="transcript-bar__btn" onClick={() => setConfirmClear(true)}
+                      disabled={chat.messages.length <= 1 && !chat.streaming}>
+                <TrashIcon width={14} height={14} /> Clear chat</button>
+            )}
+            <span className="transcript-bar__spacer" />
+            <button type="button" className="transcript-bar__btn" aria-pressed={size.tall}
+                    onClick={() => size.setHeight(size.tall ? null : maxH())}>
+              <ExpandIcon width={14} height={14} /> {size.tall ? 'Normal size' : 'Taller'}</button>
+          </div>
+          <div className={`transcript ${size.height ? 'transcript--sized' : ''}`} ref={scrollRef} aria-live="polite"
+               style={size.height ? { height: size.height } : undefined} data-testid="transcript-box">
+            {chat.messages.map((m, i) => (
               <MessageBubble key={m.id} role={m.role} text={m.text}
                              saved={saved.some((s) => s.text === m.text)}
-                             onSave={() => void saveReply(m.text)} />
+                             onSave={() => void saveReply(m.text)}
+                             onRemove={i === 0 && m.role === 'assistant' || chat.streaming ? undefined : () => void chat.remove(m.id)} />
             ))}
             {chat.streaming && (chat.draft ? (
               <MessageBubble role="assistant" text={chat.draft} pending />
@@ -116,6 +184,14 @@ export function ChatExperience({ savedPlacement = 'aside' }: Props) {
             {chat.approval && <ApprovalCard approval={chat.approval} onAnswer={(a) => void chat.answerApproval(a)} />}
             {chat.error && <p className="chat-error" role="alert">{chat.error}</p>}
           </div>
+          <button type="button" className="transcript-resize" role="separator" aria-orientation="horizontal"
+                  aria-valuemin={MIN_H} aria-valuemax={typeof window === 'undefined' ? 800 : maxH()}
+                  aria-valuenow={Math.round(size.height ?? scrollRef.current?.getBoundingClientRect().height ?? 300)}
+                  aria-label="Resize the conversation (drag, or use the up and down arrow keys)"
+                  title="Drag to make the conversation taller or shorter; double-click to reset"
+                  onPointerDown={size.startDrag} onKeyDown={size.onKey} onDoubleClick={() => size.setHeight(null)}>
+            <GripIcon width={18} height={18} />
+          </button>
         </div>
 
         {saveWorkOpen ? (

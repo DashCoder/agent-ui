@@ -1,8 +1,10 @@
 export interface SiteConfig {
-  brand: { name: string; adminTitle: string; landingUrl: string };
+  brand: { name: string; adminTitle: string; landingUrl: string; consoleName?: string };
   assistant: { name: string; greeting: string; learnByDefault: boolean };
   avatar: AvatarConfig;
   quickReplies: string[];
+  /** Installed agents, with what they suggest for the chat. */
+  plugins?: { name: string; version: string; quickReplies?: string[]; assistantHint?: string }[];
 }
 
 export interface AvatarConfig {
@@ -105,4 +107,45 @@ export interface AuditEvent {
   action: string;
   target: string;
   detail: Record<string, unknown>;
+}
+
+export interface Conversation {
+  id: string;
+  channel: 'chat';
+  contact: string;
+  startedAt: number;
+  lastAt: number;
+  messages: number;
+  questions: number;
+  summary: string | null;
+  reply: string | null;
+  status: 'answered' | 'no_reply';
+}
+
+export interface ConversationMessage { id: string; role: 'user' | 'assistant'; text: string; created_at: number }
+
+export interface UsageCounts { messages: number; conversations: number; actions: number; toolCalls: number }
+
+export interface Usage {
+  agents: { id: string; today: UsageCounts; month: UsageCounts }[];
+  history: ({ month: string } & UsageCounts)[];
+  currentMonth: string;
+  costTracked: boolean;
+}
+
+export interface InstalledPlugin {
+  key: string; repo: string; plugin: string; title: string; url: string; ref: string; commit: string;
+  builtin: boolean; installed: boolean; enabled: boolean; running: boolean; version: string | null;
+}
+export interface PluginJob {
+  id: string; action: 'add' | 'enable' | 'disable' | 'remove'; status: 'queued' | 'running' | 'done' | 'failed';
+  name: string; title?: string; url?: string; commit?: string; createdAt: number; finishedAt?: number; exitCode?: number;
+  by?: string; log?: string;
+}
+export interface PluginList { plugins: InstalledPlugin[]; jobs: PluginJob[]; sources: string[]; installerReady: boolean }
+export interface PluginSetting { name: string; label?: string; help?: string; secret?: boolean; required?: boolean }
+export interface PluginCheck {
+  id: string; url: string; ref: string; commit: string; repo: string; name: string; title: string; version?: string;
+  description: string; settings: PluginSetting[]; ui: boolean; python?: string; author: string; date: string;
+  message: string; warnings: string[]; update: boolean;
 }

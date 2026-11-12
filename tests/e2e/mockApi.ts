@@ -10,6 +10,11 @@ export interface MockState {
   settings: Record<string, any>;
   knowledge: { id: string; kind: string; value: string; created_at: number }[];
   lastSend?: { text: string; learn: boolean };
+  plugins: any[];
+  jobs: any[];
+  installerReady: boolean;
+  /** Messages in the chat, oldest first (for removing a question and its answer). */
+  log: { id: string; role: string }[];
 }
 
 export const SITE = {
@@ -29,7 +34,13 @@ function sse(events: object[]) {
 
 export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promise<MockState> {
   const state: MockState = {
-    loggedIn: false, saved: [], knowledge: [],
+    loggedIn: false, saved: [], knowledge: [], jobs: [], installerReady: true, log: [],
+    plugins: [
+      { key: 'demo', repo: 'demo-agent', plugin: 'demo', title: 'Demo agent', url: '', ref: '', commit: '', builtin: true,
+        installed: true, enabled: true, running: true, version: '1.0.0' },
+      { key: 'myext', repo: 'my-ext', plugin: 'myext', title: 'My extension', url: 'https://github.com/DashCoder/my-ext',
+        ref: 'main', commit: 'abc1234def', builtin: false, installed: true, enabled: false, running: false, version: '0.1.0' },
+    ],
     settings: { ...structuredClone(SITE), business: { services: '', booking: '', rates: '£49/month', areas: '' },
                 phone: { number: '', script: '' }, calendar: { provider: '', connected: false } },
     ...opts,
@@ -49,27 +60,42 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
     const body = req.postData() ? (() => { try { return JSON.parse(req.postData()!); } catch { return {}; } })() : {};
 
     if (path === '/api/config') return json(route, { brand: state.settings.brand, assistant: state.settings.assistant,
-      avatar: state.settings.avatar, quickReplies: state.settings.quickReplies });
+      avatar: state.settings.avatar, quickReplies: state.settings.quickReplies,
+      plugins: [{ name: 'demo', version: '1.0.0', quickReplies: ['List my last 5 Jira tickets', 'What are your rates?'] }] });
+    if (path.startsWith('/api/chat/sessions/s1/messages/') && method === 'DELETE') {
+      const mid = path.split('/').pop()!;
+      const i = state.log.findIndex((m) => m.id === mid);
+      if (i < 0) return json(route, { detail: 'Message not found' }, 404);
+      const removed = [mid];
+      if (state.log[i].role === 'user' && state.log[i + 1]?.role === 'assistant') removed.push(state.log[i + 1].id);
+      state.log = state.log.filter((m) => !removed.includes(m.id));
+      return json(route, { removed });
+    }
     if (path === '/api/chat/sessions' && method === 'POST')
       return json(route, { id: 's1', messages: [{ id: 'g', role: 'assistant', text: state.settings.assistant.greeting, created_at: now() }] });
     if (path.endsWith('/messages')) return json(route, {}, 404);
     if (path.endsWith('/stream')) {
       state.lastSend = { text: body.text, learn: body.learn };
       const user = { id: id(), role: 'user', text: body.text, created_at: now() };
+      const answerId = id();
+      state.log.push({ id: user.id, role: 'user' }, { id: answerId, role: 'assistant' });
       if (/delete/i.test(body.text)) {
         return route.fulfill({ status: 200, contentType: 'text/event-stream', body: sse([
           { type: 'start', userMessage: user }, { type: 'delta', text: 'I need your OK first.' },
           { type: 'approval', runId: 'run1', prompt: `Allow the assistant to: ${body.text}` },
           { type: 'done', message: { id: id(), role: 'assistant', text: 'I need your OK first.', created_at: now() } }]) });
       }
-      const reply = /rate/i.test(body.text) ? 'Plans start at £49 per month.'
+      const reply = /tools/i.test(body.text)
+        ? 'I have six tools whose names start with `mcp__inagentic__` (two underscores):\n\n1. mcp__inagentic__get_jira_ticket: Reads a Jira ticket.\n2. `mcp__inagentic__propose_pull_request`: Opens a pull request.\n\n- one\n- two'
+        : /long/i.test(body.text) ? Array.from({ length: 40 }, (_, n) => `Line ${n + 1} of a long answer.`).join('\n\n')
+        : /rate/i.test(body.text) ? 'Plans start at £49 per month.'
         : /mascot/i.test(body.text)
           ? 'Done! See https://github.com/inagentic/agent-ui for code.\n\nSaved at:\n/Users/aiagents/.hermes/cache/generated/images/mascot.png\n\n```py\nprint("hi")\n```'
           : `You said: ${body.text}`;
       return route.fulfill({ status: 200, contentType: 'text/event-stream', body: sse([
         { type: 'start', userMessage: user }, { type: 'progress', label: 'Thinking…' },
         { type: 'delta', text: reply.slice(0, 10) }, { type: 'delta', text: reply.slice(10) },
-        { type: 'done', message: { id: id(), role: 'assistant', text: reply, created_at: now() } }]) });
+        { type: 'done', message: { id: answerId, role: 'assistant', text: reply, created_at: now() } }]) });
     }
     if (path === '/api/chat/runs/run1/approval')
       return json(route, { status: body.approve ? 'approved' : 'denied', message: body.approve ? 'Done.' : 'OK, I won\'t.',
@@ -105,7 +131,7 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
         { id: 'phone', icon: '📞', title: 'Phone assistant', description: 'Add your phone number.', href: '/admin/phone', done: !!state.settings.phone.number },
         { id: 'knowledge', icon: '📚', title: 'Knowledge base', description: 'Connect documents.', href: '/admin/knowledge', done: state.knowledge.length > 0 },
         { id: 'calendar', icon: '📅', title: 'Booking & calendar', description: 'Connect a calendar.', href: '/admin/calendar', done: false },
-        { id: 'widget', icon: '💬', title: 'Chat widget', description: 'Chat with a face and voice.', href: '/admin/builder', done: true },
+        { id: 'widget', icon: '💬', title: 'Chat widget', description: 'Chat with a face and voice.', href: '/admin/agent', done: true },
       ],
       stats: { conversations24h: 2, messages24h: 5, savedReplies: state.saved.length, knowledgeSources: state.knowledge.length },
       agent: { mode: 'mock', reachable: true },
@@ -127,6 +153,59 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
       mode: 'hermes', status: { mode: 'hermes', reachable: true, authorized: true, models: ['hermes-agent'] },
       skills: [{ name: 'book-appointment', description: 'Books a slot' }], dashboardUrl: 'https://mac-mini.tailnet.ts.net:9119',
     });
+    if (path === '/api/admin/activity') return json(route, { items: [
+      { id: 'e2', ts: now() - 60, actor: 'hermes', action: 'mcp.call', target: 'add_note', detail: { plugin: 'demo' } },
+      { id: 'e1', ts: now() - 120, actor: 'agent', action: 'pr.proposed', target: 'DashCoder/agent-api#7', detail: { files: 2 } }] });
+    if (path === '/api/admin/conversations') return json(route, { hasMore: false, items: [
+      { id: 'c1', channel: 'chat', contact: 'Visitor 4f2a91', startedAt: now() - 3600, lastAt: now() - 3500, messages: 2, questions: 1,
+        summary: 'What are your rates?', reply: 'Plans start at £49 per month.', status: 'answered' }] });
+    if (path === '/api/admin/conversations/c1') return json(route, { messages: [
+      { id: 'm1', role: 'user', text: 'What are your rates?', created_at: now() - 3600 },
+      { id: 'm2', role: 'assistant', text: 'Plans start at £49 per month.', created_at: now() - 3590 }] });
+    if (path === '/api/admin/usage') {
+      const c = (m: number, t: number) => ({ messages: m, conversations: m ? 1 : 0, actions: t, toolCalls: t });
+      const agents = [{ id: 'assistant', today: c(2, 0), month: c(20, 1) }, { id: 'demo', today: c(0, 3), month: c(0, 12) }]
+        .filter((a) => ['all', null, a.id].includes(url.searchParams.get('agent')));
+      return json(route, { agents, currentMonth: '2026-11', costTracked: false,
+        history: [{ month: '2026-11', ...c(20, 13) }, { month: '2026-10', ...c(8, 4) }] });
+    }
+    if (path === '/api/admin/plugins') return json(route, { plugins: state.plugins, jobs: state.jobs,
+      sources: ['github.com/DashCoder'], installerReady: state.installerReady });
+    if (path === '/api/admin/plugins/check') {
+      if (!String(body.url).startsWith('https://github.com/DashCoder/'))
+        return json(route, { detail: 'Plugins can only come from: github.com/DashCoder.' }, 403);
+      return json(route, { id: 'chk1', url: body.url, ref: body.ref, commit: '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432',
+        repo: 'ina-sales-agent', name: 'sales', title: 'Sam', version: '0.3.0', description: 'Sales pipeline from your CRM.',
+        settings: [{ name: 'SALES_CRM_TOKEN', label: 'CRM token', secret: true, required: true, help: 'Read-only token' }],
+        ui: true, python: 'api/sales', author: 'Axel', date: '2026-11-10', message: 'Add pipeline view', warnings: [], update: false });
+    }
+    const queue = (action: string, name: string, extra: object = {}) => {
+      const job = { id: `job${state.jobs.length + 1}`, action, name, status: 'running', createdAt: now(), by: 'admin',
+                    log: `${action} ${name}\n→ Code\n`, polls: 0, ...extra };
+      state.jobs.unshift(job);
+      return job;
+    };
+    if (path === '/api/admin/plugins/install') {
+      if (!body.settings?.SALES_CRM_TOKEN) return json(route, { detail: 'missing setting' }, 400);
+      return json(route, queue('add', 'sales', { title: 'Sam', commit: '9f8e7d6c5b4a39281706f5e4d3c2b1a098765432' }));
+    }
+    const toggle = path.match(/^\/api\/admin\/plugins\/(\w+)\/(toggle|remove)$/);
+    if (toggle) return json(route, queue(toggle[2] === 'remove' ? 'remove' : body.enabled ? 'enable' : 'disable', toggle[1]));
+    const jobm = path.match(/^\/api\/admin\/plugins\/jobs\/(\w+)$/);
+    if (jobm) {
+      const job = state.jobs.find((j) => j.id === jobm[1]);
+      if (job && job.status === 'running' && ++job.polls >= 2) {
+        job.status = 'done'; job.log += '✓ Done. Backup: 2026-11-12_101500\n';
+        if (job.action === 'add') state.plugins.push({ key: 'sales', repo: 'ina-sales-agent', plugin: 'sales', title: 'Sam',
+          url: 'https://github.com/DashCoder/ina-sales-agent', ref: 'main', commit: job.commit, builtin: false, installed: true,
+          enabled: true, running: true, version: '0.3.0' });
+        const p = state.plugins.find((x) => x.key === job.name);
+        if (p && job.action === 'enable') Object.assign(p, { enabled: true, running: true });
+        if (p && job.action === 'disable') Object.assign(p, { enabled: false, running: false });
+        if (job.action === 'remove') state.plugins = state.plugins.filter((x) => x.key !== job.name);
+      }
+      return job ? json(route, job) : json(route, { detail: 'No such job' }, 404);
+    }
     return json(route, { detail: `Not mocked: ${method} ${path}` }, 404);
   });
   return state;

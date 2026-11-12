@@ -79,21 +79,77 @@ function inline(text: string): ReactNode[] {
   return out;
 }
 
+/** Internal tool names (mcp__inagentic__get_jira_ticket) read as "Get Jira ticket". The agent is told not to use
+ * them, but this catches the ones that slip through. */
+const TOOL_ID = /`?\bmcp__([A-Za-z0-9-]+)__([A-Za-z0-9_]*)`?/g;
+const WORDS: Record<string, string> = { jira: 'Jira', github: 'GitHub', kpi: 'KPI', kpis: 'KPIs', pr: 'pull request',
+  prs: 'pull requests', repo: 'repository', repos: 'repositories', api: 'API', mcp: 'MCP', url: 'URL', id: 'ID' };
+export function humanizeTools(text: string): string {
+  return text.replace(TOOL_ID, (_m, server: string, tool: string) => {
+    if (!tool) return `the ${server.charAt(0).toUpperCase()}${server.slice(1)} tools`;
+    const words = tool.split('_').filter(Boolean).map((w) => WORDS[w.toLowerCase()] ?? w.toLowerCase());
+    const label = words.join(' ');
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  });
+}
+
+const BULLET = /^\s*[-*•]\s+(.*)$/;
+const NUMBER = /^\s*\d+[.)]\s+(.*)$/;
+const HEADING = /^\s*#{1,6}\s+(.*)$/;
+
+/** One paragraph block: lines, with runs of "- item" / "1. item" turned into real lists and "## Title" into a
+ * small heading. */
+function Block({ text }: { text: string }) {
+  const lines = text.split('\n');
+  const out: ReactNode[] = [];
+  let para: string[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+  const flushPara = () => {
+    if (para.length) out.push(<p key={out.length}>{para.map((line, j) => <span key={j}>{j > 0 && <br />}{inline(line)}</span>)}</p>);
+    para = [];
+  };
+  const flushList = () => {
+    if (!list) return;
+    const items = list.items.map((it, j) => <li key={j}>{inline(it)}</li>);
+    out.push(list.ordered ? <ol key={out.length}>{items}</ol> : <ul key={out.length}>{items}</ul>);
+    list = null;
+  };
+  for (const line of lines) {
+    const b = line.match(BULLET);
+    const n = !b && line.match(NUMBER);
+    const h = !b && !n && line.match(HEADING);
+    if (b || n) {
+      const ordered = !!n;
+      flushPara();
+      if (list && list.ordered !== ordered) flushList();
+      list = list ?? { ordered, items: [] };
+      list.items.push((b || n as RegExpMatchArray)[1]);
+    } else if (h) {
+      flushPara(); flushList();
+      out.push(<h4 key={out.length}>{inline(h[1].replace(/\*\*/g, ''))}</h4>);
+    } else if (list && /^\s{2,}\S/.test(line)) {
+      list.items[list.items.length - 1] += ` ${line.trim()}`;   // wrapped list item
+    } else {
+      flushList();
+      if (line.trim()) para.push(line);
+    }
+  }
+  flushPara(); flushList();
+  return <>{out}</>;
+}
+
 /**
- * Chat text: paragraphs, line breaks, ``` code blocks ```, `code`, **bold**, and links shown as short labels
- * ("Go to github.com", "Download image") with the full address on hover. File paths the agent mentions
- * become download links (served by agent-api from its allowed folders), with a preview for images.
+ * Chat text: paragraphs, line breaks, lists, small headings, ``` code blocks ```, `code`, **bold**, and links shown
+ * as short labels ("Go to github.com", "Download image") with the full address on hover. File paths the agent
+ * mentions become download links (served by agent-api from its allowed folders), with a preview for images.
  */
 export function RichText({ text }: { text: string }) {
-  const blocks = text.split(/```[^\n]*\n?([\s\S]*?)```/g);
+  const blocks = humanizeTools(text).split(/```[^\n]*\n?([\s\S]*?)```/g);
   return (
     <>
       {blocks.map((block, bi) => bi % 2 === 1
         ? <pre key={bi} className="chat-code"><code>{block.replace(/\n$/, '')}</code></pre>
-        : block.split(/\n{2,}/).filter((p) => p.trim()).map((p, i) => (
-          <p key={`${bi}-${i}`}>{p.split('\n').map((line, j) => (
-            <span key={j}>{j > 0 && <br />}{inline(line)}</span>))}</p>
-        )))}
+        : block.split(/\n{2,}/).filter((p) => p.trim()).map((p, i) => <Block key={`${bi}-${i}`} text={p} />))}
     </>
   );
 }
