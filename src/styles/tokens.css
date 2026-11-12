@@ -1,6 +1,7 @@
 /* Design tokens — change these to re-brand. Chat (visitor) and admin themes are separate. */
 :root {
   --font-chat: 'Karla', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-slack: 'Lato', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-admin: 'Nunito', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* chat */
@@ -25,6 +26,23 @@
   --avatar-glow: rgb(79 70 229 / 45%);
   --c-primary-text: #ffffff;
   --c-disabled: #c8d0da;
+
+  /* visitor chat, Slack-like */
+  --s-side: #3f0e40;           /* sidebar (Slack aubergine) */
+  --s-side-text: #cfc3cf;
+  --s-side-hover: rgb(255 255 255 / 10%);
+  --s-side-w: 300px;
+  --s-aubergine: #4a154b;
+  --s-frame: #ffffff;
+  --s-bg: #ffffff;
+  --s-text: #1d1c1d;
+  --s-muted: #616061;
+  --s-border: #dddddd;
+  --s-btn-border: #bbbbbb;
+  --s-hover: #f8f8f8;
+  --s-badge: #e8e8e8;
+  --s-link: #1264a3;
+  --s-green: #007a5a;
 
   /* admin */
   --a-page: #f2ece2;

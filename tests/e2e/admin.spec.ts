@@ -104,7 +104,7 @@ test.describe('admin console', () => {
     await page.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByRole('status').first()).toHaveText('✓ Saved');
     await page.goto('/');
-    await expect(page.getByPlaceholder('Ask Ava anything…')).toBeVisible();
+    await expect(page.getByPlaceholder('Message Ava')).toBeVisible();
   });
 
   test('quick replies: add one suggested by an installed agent', async ({ page }) => {
@@ -229,7 +229,7 @@ test('Model & tools: change Hermes\' model (with rollback) and an agent\'s model
   const h = page.getByTestId('hermes-model-picker');
   await expect(h.getByTestId('hermes-model-picker-openrouter')).toContainText('In use');
   await h.getByTestId('hermes-model-picker-ollama').getByRole('radio').check();
-  await expect(h).toContainText('OLLAMA_CONTEXT_LENGTH');
+  await expect(h).toContainText('gpt-oss:20b');
   await h.getByLabel('Local model (Ollama) model').fill('qwen3:14b');
   await h.getByRole('button', { name: 'Save and restart Hermes' }).click();
   await expect(h.getByRole('status')).toContainText('Hermes now uses qwen3:14b');

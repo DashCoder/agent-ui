@@ -36,7 +36,10 @@ export function Picker({ title, intro, kinds, current, suggestions, installed, w
     setModels((m) => ({ ...m, [current.provider]: current.model }));
   }, [current?.provider, current?.model]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const model = (models[provider] ?? '').trim() || (suggestions[provider]?.[0] ?? '');
+  // what the box shows when nothing has been typed: the current model, else the first installed or suggested one
+  const listFor = (id: string) => [...new Set([...(id === 'ollama' ? installed : []), ...(suggestions[id] ?? [])])];
+  const shown = (id: string) => models[id] ?? (current?.provider === id ? current.model : listFor(id)[0] ?? '');
+  const model = shown(provider).trim();
   const dirty = !current || provider !== current.provider || model !== current.model;
   const run = async (kind: 'save' | 'test') => {
     setBusy(kind); setResult(null);
@@ -51,7 +54,7 @@ export function Picker({ title, intro, kinds, current, suggestions, installed, w
       <p className="page-head__sub" style={{ margin: '4px 0 14px' }}>{intro}</p>
       <div className="engines" role="radiogroup" aria-label={title}>
         {kinds.map((k) => {
-          const list = [...new Set([...(k.id === 'ollama' ? installed : []), ...(suggestions[k.id] ?? [])])];
+          const list = listFor(k.id);
           return (
             <label key={k.id} className={`engine ${provider === k.id ? 'engine--on' : ''}`} data-testid={`${testid}-${k.id}`}>
               <input type="radio" name={testid} value={k.id} checked={provider === k.id} onChange={() => setProvider(k.id)} />
@@ -63,7 +66,7 @@ export function Picker({ title, intro, kinds, current, suggestions, installed, w
                 <span className="engine__text">{HELP[k.id] ?? ''}
                   {provider === k.id && (
                     <span className="engine__field">
-                      <input list={`${testid}-${k.id}-models`} value={models[k.id] ?? (current?.provider === k.id ? current.model : list[0] ?? '')}
+                      <input list={`${testid}-${k.id}-models`} value={shown(k.id)}
                              onChange={(e) => setModels((m) => ({ ...m, [k.id]: e.target.value }))} aria-label={`${k.name} model`} />
                       <datalist id={`${testid}-${k.id}-models`}>{list.map((m) => <option key={m} value={m} />)}</datalist>
                     </span>
@@ -117,7 +120,7 @@ export function HermesModelPanel({ data, onSaved }: { data: ModelsOverview; onSa
   const h = data.hermes;
   const kinds = Object.entries(h.kinds).map(([id, name]) => ({ id, name,
     ready: id === 'ollama' ? data.providers.ollama?.ready : undefined,
-    note: id === 'ollama' ? 'Hermes needs a context of at least 64,000 tokens: set OLLAMA_CONTEXT_LENGTH=65536 for Ollama (see the guide).'
+    note: id === 'ollama' ? 'Hermes needs a model that holds at least 64,000 tokens, e.g. gpt-oss:20b (qwen3:14b stops at 40,960). Pull it first: ollama pull gpt-oss:20b.'
       : id === 'openrouter' || id === 'anthropic' || id === 'bedrock' ? 'Uses the key in Hermes’ own ~/.hermes/.env.' : null }));
   const current = h.current?.model ? { provider: h.current.kind && h.kinds[h.current.kind] ? h.current.kind : 'openrouter', model: h.current.model } : null;
   return (
@@ -125,7 +128,7 @@ export function HermesModelPanel({ data, onSaved }: { data: ModelsOverview; onSa
       intro={`The model behind chat, Slack and every tool call. Hermes itself always runs on this machine; this is the
         model it thinks with. Saving changes ${h.file} (a backup is kept), restarts Hermes and asks it a test question;
         if it doesn't answer, the previous model is put back.`}
-      kinds={kinds} current={current} suggestions={{ ...data.suggestions, anthropic: ['claude-sonnet-4-6', 'claude-haiku-4-5'],
+      kinds={kinds} current={current} suggestions={{ ...data.suggestions, ollama: ['gpt-oss:20b', 'qwen3-coder:30b', ...(data.suggestions.ollama ?? [])], anthropic: ['claude-sonnet-4-6', 'claude-haiku-4-5'],
         bedrock: ['eu.anthropic.claude-sonnet-4-5-20250929-v1:0'] }} installed={data.providers.ollama?.models ?? []}
       onSave={async (p, m) => { const r = await api.saveModel('hermes', p, m); onSaved();
         return { ok: !!r.ok, message: r.ok ? `Hermes now uses ${m}.` : `Not changed: ${r.error ?? 'Hermes didn’t answer'}.`, steps: r.steps }; }} />

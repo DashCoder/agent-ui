@@ -12,6 +12,11 @@ test.describe('visitor chat', () => {
     }
     await expect(page.getByRole('button', { name: 'Send' })).toBeDisabled();
     await expect(page.getByRole('link', { name: 'Admin →' })).toBeVisible();
+    // Slack-style: the agent's name with an APP badge, and quick replies as buttons under its message
+    const greeting = page.getByTestId('msg-assistant').first();
+    await expect(greeting.locator('.smsg__name')).toHaveText('Builder');
+    await expect(greeting.locator('.smsg__app')).toHaveText('APP');
+    await expect(greeting.getByRole('group', { name: 'Suggestions' })).toBeVisible();
   });
 
   test('a quick reply streams an answer that can be saved and removed', async ({ page }) => {
@@ -20,7 +25,10 @@ test.describe('visitor chat', () => {
     await page.getByRole('button', { name: 'What are your rates?' }).click();
     const reply = page.getByTestId('msg-assistant').nth(1);
     await expect(reply).toHaveText(/Plans start at £49 per month\./);
+    await reply.locator('.smsg__text').click();
     await reply.getByRole('button', { name: 'Save reply' }).click();
+    const fold = page.locator('summary', { hasText: 'Saved replies' });
+    if (!(await page.getByTestId('saved-item').first().isVisible().catch(() => false))) await fold.click();
     const saved = page.getByTestId('saved-item');
     await expect(saved).toHaveCount(1);
     await expect(saved).toContainText('£49');
@@ -31,13 +39,14 @@ test.describe('visitor chat', () => {
   test('typing a message sends the learn flag', async ({ page }) => {
     const state = await mockApi(page);
     await page.goto('/');
-    await expect(page.getByText('(off — faster replies)')).toBeVisible();
-    await page.getByLabel('Learn and improve').check();
-    await expect(page.getByText('(on — remembers useful answers)')).toBeVisible();
+    const learn = page.getByLabel('Learn and improve');
+    await expect(learn).not.toBeChecked();
+    await learn.check({ force: true });
+    await expect(learn).toBeChecked();
     await page.getByLabel('Message Builder').fill('hello there');
     await page.getByRole('button', { name: 'Send' }).click();
-    await expect(page.getByTestId('msg-user')).toHaveText('hello there');
-    await expect(page.getByTestId('msg-assistant').nth(1)).toHaveText('You said: hello there');
+    await expect(page.getByTestId('msg-user').locator('.smsg__text')).toHaveText('hello there');
+    await expect(page.getByTestId('msg-assistant').nth(1).locator('.smsg__text')).toHaveText('You said: hello there');
     expect(state.lastSend).toEqual({ text: 'hello there', learn: true });
   });
 
@@ -50,7 +59,7 @@ test.describe('visitor chat', () => {
     await expect(card).toContainText('Allow the assistant to: delete old logs');
     await card.getByRole('button', { name: 'Approve' }).click();
     await expect(card).toHaveCount(0);
-    await expect(page.getByTestId('msg-assistant').last()).toHaveText('Done.');
+    await expect(page.getByTestId('msg-assistant').last().locator('.smsg__text')).toHaveText('Done.');
   });
 
   test('save my work links an email with a code', async ({ page }) => {
@@ -127,7 +136,7 @@ test('every avatar clip is preloaded once, so switching clips never reloads a vi
 test('links show as short labels and agent files become downloads', async ({ page }) => {
   await mockApi(page);
   await page.goto('/');
-  await page.getByPlaceholder(/Ask/).fill('make a mascot');
+  await page.getByPlaceholder(/Message/).fill('make a mascot');
   await page.getByRole('button', { name: 'Send' }).click();
   const reply = page.getByTestId('msg-assistant').nth(1);
   const site = reply.getByRole('link', { name: 'Go to github.com' });
@@ -143,7 +152,7 @@ test('links show as short labels and agent files become downloads', async ({ pag
 test('replies read cleanly: lists, and tool names in plain words', async ({ page }) => {
   await mockApi(page);
   await page.goto('/');
-  await page.getByPlaceholder(/Ask .* anything/).fill('List your tools');
+  await page.getByPlaceholder(/Message/).fill('List your tools');
   await page.getByRole('button', { name: 'Send' }).click();
   const reply = page.getByTestId('msg-assistant').last();
   await expect(reply.locator('ol li')).toHaveText(['Get Jira ticket: Reads a Jira ticket.', 'Propose pull request: Opens a pull request.']);
@@ -155,16 +164,16 @@ test('replies read cleanly: lists, and tool names in plain words', async ({ page
 test('remove one question and its answer, then clear the whole chat', async ({ page }) => {
   const state = await mockApi(page);
   await page.goto('/');
-  const box = page.getByPlaceholder(/Ask .* anything/);
+  const box = page.getByPlaceholder(/Message/);
   for (const q of ['What are your rates?', 'Hello there']) {
     await box.fill(q);
     await page.getByRole('button', { name: 'Send' }).click();
     await expect(page.getByTestId('msg-assistant')).toHaveCount(q === 'Hello there' ? 3 : 2);
   }
   const first = page.getByTestId('msg-user').filter({ hasText: 'What are your rates?' });
-  await first.hover();
+  await first.locator('.smsg__text').click();
   await first.getByRole('button', { name: 'Remove this question and its answer' }).click();
-  await expect(page.getByTestId('msg-user')).toHaveText(['Hello there']);
+  await expect(page.getByTestId('msg-user').locator('.smsg__text')).toHaveText(['Hello there']);
   await expect(page.getByText('Plans start at £49 per month.')).toHaveCount(0);
   expect(state.log).toHaveLength(2);
   await expect(page.getByTestId('msg-assistant').first().getByRole('button', { name: /Remove/ })).toHaveCount(0); // greeting stays
@@ -175,27 +184,44 @@ test('remove one question and its answer, then clear the whole chat', async ({ p
   await expect(page.getByRole('button', { name: 'Clear chat' })).toBeDisabled();
 });
 
-test('the conversation can be made taller, and the size is remembered', async ({ page }) => {
+test('the avatar sidebar collapses for a wider conversation, and the choice is remembered', async ({ page }) => {
   await mockApi(page);
   await page.goto('/');
-  const t = page.getByTestId('transcript-box');
-  const before = (await t.boundingBox())!.height;
-  await page.getByRole('button', { name: 'Taller' }).click();
-  const tall = (await t.boundingBox())!.height;
-  expect(tall).toBeGreaterThan(before + 50);
-  await page.getByRole('button', { name: 'Normal size' }).click();
-  expect((await t.boundingBox())!.height).toBeLessThan(tall);
-  const handle = page.getByRole('separator', { name: /Resize the conversation/ });
-  const hb = (await handle.boundingBox())!;
-  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2 + 120, { steps: 5 });
-  await page.mouse.up();
-  const dragged = (await t.boundingBox())!.height;
-  expect(dragged).toBeGreaterThan(before + 80);
-  await handle.focus();
-  await page.keyboard.press('ArrowUp');
-  expect((await t.boundingBox())!.height).toBeLessThan(dragged);
+  const list = page.getByTestId('transcript-box');
+  const before = (await list.boundingBox())!.width;
+  await page.getByRole('button', { name: 'Hide avatar' }).click();
+  await expect(page.getByTestId('avatar')).toHaveCount(0);
+  const isPhone = (page.viewportSize()?.width ?? 1000) < 760;
+  if (!isPhone) expect((await list.boundingBox())!.width).toBeGreaterThan(before + 150);
   await page.reload();
-  expect(Math.abs((await t.boundingBox())!.height - (dragged - 40))).toBeLessThan(3);
+  await expect(page.getByTestId('avatar')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show avatar' }).first().click();
+  await expect(page.getByTestId('avatar')).toBeVisible();
+});
+
+test('Slack-style message box: formatting, emoji, mention, shortcuts and Enter to send', async ({ page }) => {
+  const state = await mockApi(page);
+  await page.goto('/');
+  const box = page.getByLabel('Message Builder');
+  if (await page.getByRole('button', { name: 'Show formatting' }).isVisible()) {
+    await page.getByRole('button', { name: 'Show formatting' }).click();
+  }
+  await box.fill('important');
+  await box.selectText();
+  await page.getByRole('button', { name: 'Bold' }).click();
+  await expect(box).toHaveValue('**important**');
+  await page.getByRole('button', { name: 'Emoji' }).click();
+  await page.getByRole('menuitem', { name: 'Insert 👍' }).click();
+  await page.getByRole('button', { name: 'Mention Builder' }).click();
+  await expect(box).toHaveValue(/\*\*important\*\*👍@Builder $/);
+  await box.press('Enter');
+  await expect(page.getByTestId('msg-user').last().locator('strong')).toHaveText('important');
+  expect(state.lastSend?.text).toContain('@Builder');
+  await box.fill('/rat');
+  await page.getByRole('menuitem', { name: /What are your rates\?/ }).click();
+  await expect(page.getByText('Plans start at £49 per month.')).toBeVisible();
+  await box.fill('line one');
+  await box.press('Shift+Enter');
+  await box.type('line two');
+  await expect(box).toHaveValue('line one\nline two');
 });
