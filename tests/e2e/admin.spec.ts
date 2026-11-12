@@ -129,8 +129,9 @@ test.describe('admin console', () => {
   test('Model & tools shows status and the dashboard link', async ({ page }) => {
     await mockApi(page, { loggedIn: true });
     await page.goto('/admin/model');
-    await expect(page.getByText('hermes-agent', { exact: true })).toBeVisible();
     await expect(page.getByText('book-appointment')).toBeVisible();
+    await expect(page.getByTestId('hermes-model')).toContainText('anthropic/claude-sonnet-4.5');
+    await expect(page.getByTestId('hermes-model')).toContainText('via openrouter');
     await expect(page.getByRole('link', { name: 'Open full Hermes dashboard ↗' }))
       .toHaveAttribute('href', 'https://mac-mini.tailnet.ts.net:9119');
   });

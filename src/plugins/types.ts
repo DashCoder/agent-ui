@@ -64,4 +64,6 @@ export interface AgentUIPlugin {
   menu?: MenuSection[];
   /** Version 2: the agent's own dashboard. Without one it gets a standard dashboard (activity, its pages). */
   dashboard?: ReactNode;
+  /** Version 2: shown at the top of Model & tools when this agent is picked, e.g. the agent's own model choice. */
+  modelPanel?: ReactNode;
 }

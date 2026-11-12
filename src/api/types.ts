@@ -93,6 +93,8 @@ export interface HermesInfo {
   status: AgentStatus;
   skills: { name: string; description: string }[];
   dashboardUrl: string | null;
+  /** The model in Hermes' own config ("hermes-agent" is only the API's name). */
+  configured?: { model?: string; provider?: string; baseUrl?: string } | null;
 }
 
 export interface User {

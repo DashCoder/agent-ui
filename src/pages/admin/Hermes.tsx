@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import type { HermesInfo } from '../../api/types';
 import { PageHeader } from './AdminLayout';
+import { ALL, useAgent } from './agents';
 
 const GUIDE_URL = 'https://github.com/DashCoder/agent-ui/blob/main/docs/HERMES_MAC_MINI_SETUP.md';
 
@@ -16,6 +17,8 @@ export function Hermes() {
   useEffect(() => { void load(); }, [load]);
 
   const s = info?.status;
+  const { agent } = useAgent();
+  const conf = info?.configured;
   return (
     <>
       <PageHeader title="Model &amp; tools" subtitle="Hermes, the agent runtime on this machine: its model, connection and the tools your agents use."
@@ -26,6 +29,8 @@ export function Hermes() {
           )}
         </>} />
       {error && <p className="form-error" role="alert">{error}</p>}
+      {agent.id !== ALL && agent.plugin?.modelPanel}
+      {agent.id !== ALL && agent.plugin?.modelPanel && <h2 className="panel__title" style={{ margin: '8px 0 12px' }}>Hermes (chat and tools)</h2>}
 
       {s && (
         <div className="stats">
@@ -36,8 +41,11 @@ export function Hermes() {
               {s.reachable ? 'Yes' : `No${s.error ? ` (${s.error})` : ''}`}</span></div>
           <div className="stat"><span className="stat__label">API key</span>
             <span className="stat__value stat__value--sm">{s.authorized === false ? 'Rejected' : 'OK'}</span></div>
-          <div className="stat"><span className="stat__label">Model</span>
-            <span className="stat__value stat__value--sm">{s.models?.join(', ') || '—'}</span></div>
+          <div className="stat" data-testid="hermes-model"><span className="stat__label">Model</span>
+            <span className="stat__value stat__value--sm">{conf?.model ?? s.models?.join(', ') ?? '—'}</span>
+            <span className="stat__sub">{conf?.model
+              ? `${conf.provider ? `via ${conf.provider} · ` : ''}from ~/.hermes/config.yaml`
+              : 'Hermes API name; model not found in ~/.hermes/config.yaml'}</span></div>
         </div>
       )}
 

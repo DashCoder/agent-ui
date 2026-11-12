@@ -152,6 +152,7 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
     if (path === '/api/admin/hermes') return json(route, {
       mode: 'hermes', status: { mode: 'hermes', reachable: true, authorized: true, models: ['hermes-agent'] },
       skills: [{ name: 'book-appointment', description: 'Books a slot' }], dashboardUrl: 'https://mac-mini.tailnet.ts.net:9119',
+      configured: { model: 'anthropic/claude-sonnet-4.5', provider: 'openrouter' },
     });
     if (path === '/api/admin/activity') return json(route, { items: [
       { id: 'e2', ts: now() - 60, actor: 'hermes', action: 'mcp.call', target: 'add_note', detail: { plugin: 'demo' } },
