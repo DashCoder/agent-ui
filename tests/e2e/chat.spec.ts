@@ -120,6 +120,19 @@ test.describe('live avatar switch', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Live avatar unavailable' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Live avatar' })).toHaveAttribute('aria-pressed', 'false');
   });
+
+  test("an agent with its own face goes live in its own chat only, and asks for that agent's session", async ({ page }) => {
+    const settings = structuredClone(SITE) as any;
+    settings.avatar.simliAgents = ['kpi'];                  // the site itself has no live face
+    const state = await mockApi(page, { settings });
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Live avatar' })).toHaveCount(0);
+    await page.goto('/?agent=kpi');
+    await page.getByRole('button', { name: 'Live avatar' }).click();
+    await page.getByRole('button', { name: 'Play avatar and voice' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Live avatar unavailable' })).toBeVisible();
+    expect(state.simliAgent).toBe('kpi');
+  });
 });
 
 test('every avatar clip is preloaded once, so switching clips never reloads a video', async ({ page }) => {

@@ -59,6 +59,8 @@ interface Props {
   /** Receives the live avatar's audio input while it is connected (null otherwise). */
   onSink?: (sink: AudioSink | null) => void;
   compact?: boolean;
+  /** The agent whose chat this is: its own live face, if it has one. */
+  agent?: string;
 }
 
 /**
@@ -67,14 +69,14 @@ interface Props {
  *  - Live mode (optional): a Simli lip-synced avatar, when the admin has switched it on.
  * The visitor's choice is remembered in this browser.
  */
-export function AvatarPanel({ avatar, talking, onPlayingChange, onSink, compact }: Props) {
+export function AvatarPanel({ avatar, talking, onPlayingChange, onSink, compact, agent }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [idleIdx, setIdleIdx] = useState(0);
   const [talkIdx, setTalkIdx] = useState(0);
   const [mode, setMode] = useState<AvatarMode>(() => load<AvatarMode>(MODE_KEY, 'video'));
   const [notice, setNotice] = useState<string | null>(null);
-  const canLive = !compact && !!avatar.simliAvailable;
+  const canLive = !compact && (!!avatar.simliAvailable || (!!agent && !!avatar.simliAgents?.includes(agent)));
   const live = canLive && mode === 'live';
   const hasVideo = avatar.idleVideos.length > 0;
   const hasTalk = avatar.talkVideos.length > 0;
@@ -134,7 +136,7 @@ export function AvatarPanel({ avatar, talking, onPlayingChange, onSink, compact 
         ) : (
           <img className={`avatar__media ${playing ? 'avatar__breathe' : ''}`} src={avatar.posterUrl} alt="" />
         )}
-        {live && <SimliStage active={playing} onSink={handleSink} onError={handleLiveError} />}
+        {live && <SimliStage active={playing} onSink={handleSink} onError={handleLiveError} agent={agent} />}
       </div>
       {canLive && (
         <button type="button" className={`avatar__mode ${live ? 'is-on' : ''}`} onClick={switchMode}

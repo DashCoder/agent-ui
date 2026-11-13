@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { AvatarConfig } from '../../api/types';
 import { AvatarPanel } from '../../components/AvatarPanel';
+import { useSiteConfig } from '../../hooks/useSiteConfig';
 import { useSpeech } from '../../hooks/useSpeech';
 import { PageHeader } from './AdminLayout';
 import { lines, useSettings } from './useSettings';
@@ -21,7 +22,10 @@ export const VOICES: { id: string; label: string }[] = [
 export function AvatarSettings() {
   const { settings, save, status, error } = useSettings();
   const [form, setForm] = useState({ posterUrl: '', idle: '', talk: '', speakReplies: false, voice: 'en-GB-RyanNeural',
-    simliEnabled: false, simliFaceId: '' });
+    simliEnabled: false, simliFaceId: '', simliFormat: 'square' as NonNullable<AvatarConfig['simliFormat']>,
+    simliFaces: {} as Record<string, string> });
+  const { config } = useSiteConfig();
+  const agents = (config.plugins ?? []).filter((p) => p.agentName);
   const speech = useSpeech(form.voice);
   const [previewTalking, setPreviewTalking] = useState(false);
 
@@ -30,13 +34,15 @@ export function AvatarSettings() {
     const a = settings.avatar;
     setForm({ posterUrl: a.posterUrl, idle: a.idleVideos.join('\n'), talk: a.talkVideos.join('\n'),
               speakReplies: a.speakReplies, voice: a.voice || 'en-GB-RyanNeural',
-              simliEnabled: !!a.simliEnabled, simliFaceId: a.simliFaceId ?? '' });
+              simliEnabled: !!a.simliEnabled, simliFaceId: a.simliFaceId ?? '', simliFormat: a.simliFormat ?? 'square',
+              simliFaces: { ...(a.simliFaces ?? {}) } });
   }, [settings]);
 
   const preview: AvatarConfig = { posterUrl: form.posterUrl, idleVideos: lines(form.idle),
                                   talkVideos: lines(form.talk), speakReplies: form.speakReplies,
                                   voice: form.voice, simliEnabled: form.simliEnabled,
-                                  simliFaceId: form.simliFaceId.trim() };
+                                  simliFaceId: form.simliFaceId.trim(), simliFormat: form.simliFormat,
+                                  simliFaces: Object.fromEntries(Object.entries(form.simliFaces).map(([k, v]) => [k, v.trim()])) };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -81,9 +87,24 @@ export function AvatarSettings() {
                      onChange={(e) => setForm({ ...form, simliEnabled: e.target.checked })} />
               Let visitors switch on a live lip-synced avatar
             </label>
-            <label className="field"><span>Simli face ID</span>
+            <label className="field"><span>Simli face ID (the site's assistant)</span>
               <input value={form.simliFaceId} placeholder="e.g. a face ID from app.simli.com"
                      onChange={(e) => setForm({ ...form, simliFaceId: e.target.value })} />
+            </label>
+            {agents.map((p) => (
+              <label key={p.name} className="field"><span>{p.agentName}'s own face ID (optional)</span>
+                <input value={form.simliFaces[p.name] ?? ''} placeholder={`Empty: ${p.agentName} uses the face above`}
+                       aria-label={`${p.agentName}'s Simli face ID`}
+                       onChange={(e) => setForm({ ...form, simliFaces: { ...form.simliFaces, [p.name]: e.target.value } })} />
+              </label>
+            ))}
+            <label className="field"><span>Shape of the live video (Trinity-2 faces)</span>
+              <select value={form.simliFormat} aria-label="Shape of the live video"
+                      onChange={(e) => setForm({ ...form, simliFormat: e.target.value as typeof form.simliFormat })}>
+                <option value="square">Square, 768 × 768 (fits the round picture)</option>
+                <option value="portrait">Portrait, 576 × 1024</option>
+                <option value="landscape">Landscape, 1024 × 576</option>
+              </select>
             </label>
             <span className="muted small">Also needs <code>SIMLI_API_KEY</code> in agent-api's <code>.env</code>.
               Sessions are capped per day (<code>SIMLI_DAILY_SESSIONS</code>) to control cost.</span>

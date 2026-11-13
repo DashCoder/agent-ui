@@ -145,7 +145,8 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
           {sideOpen ? (
             <>
               <div className="sl-side__stage">
-                <AvatarPanel avatar={config.avatar} talking={talking} onPlayingChange={onPlayingChange} onSink={onSink} />
+                <AvatarPanel avatar={config.avatar} talking={talking} onPlayingChange={onPlayingChange} onSink={onSink}
+                             agent={one ? agent : undefined} />
               </div>
               <div className="sl-side__who">
                 <span className="sl-side__name">{name}</span>

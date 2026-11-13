@@ -281,3 +281,14 @@ test('agent logs: OpenRouter traces, blocked calls stand out, and a filter for p
   await page.getByRole('checkbox', { name: 'Only failed or blocked' }).check();
   await expect(rows).toHaveCount(1);
 });
+
+test("avatar page: an agent's own Simli face and the Trinity-2 video shape", async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  await page.goto('/admin/avatar');
+  await page.getByRole('textbox', { name: "Kai's Simli face ID" }).fill(' 1c318dfa-33e7-4f5d-9a3d-5c2e1636ca7c ');
+  await page.getByRole('combobox', { name: 'Shape of the live video' }).selectOption('portrait');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  expect(state.settings.avatar.simliFaces).toEqual({ kpi: '1c318dfa-33e7-4f5d-9a3d-5c2e1636ca7c' });
+  expect(state.settings.avatar.simliFormat).toBe('portrait');
+});

@@ -18,6 +18,8 @@ export interface MockState {
   log: { id: string; role: string }[];
   models: any[];
   hermes: any;
+  /** The agent the last live-avatar token was asked for. */
+  simliAgent?: string | null;
 }
 
 export const SITE = {
@@ -131,7 +133,7 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
     }
     if (path === '/api/files') return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>' });
     if (path === '/api/tts') return route.fulfill({ status: 204 });
-    if (path === '/api/simli/token') return json(route, { detail: 'The live avatar is not switched on.' }, 404);
+    if (path === '/api/simli/token') { state.simliAgent = body.agent; return json(route, { detail: 'The live avatar is not switched on.' }, 404); }
     if (path === '/api/save-work/start') return json(route, { sent: true, devCode: '123456' });
     if (path === '/api/save-work/verify')
       return body.code === '123456' ? json(route, { email: body.email }) : json(route, { detail: 'That code is wrong or has expired' }, 400);

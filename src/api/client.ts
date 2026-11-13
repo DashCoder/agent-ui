@@ -130,7 +130,8 @@ export const api = {
     request<PluginJob>(`/api/admin/plugins/${encodeURIComponent(key)}/remove`, { method: 'POST' }),
   pluginJob: (id: string) => request<PluginJob>(`/api/admin/plugins/jobs/${encodeURIComponent(id)}`),
 
-  simliToken: () => request<{ sessionToken: string; maxSessionSeconds: number }>('/api/simli/token', { method: 'POST' }),
+  simliToken: (agent?: string) => request<{ sessionToken: string; maxSessionSeconds: number }>('/api/simli/token',
+    { method: 'POST', body: json({ agent: agent ?? null }) }),
 
   /** Natural voice (MP3) from agent-api. Returns null when there is nothing to say. */
   async tts(text: string, voice?: string): Promise<Blob | null> {

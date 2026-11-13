@@ -12,13 +12,15 @@ interface Props {
   active: boolean;
   onSink: (sink: AudioSink | null) => void;
   onError: (message: string) => void;
+  /** Use this agent's own face when it has one (Trinity-2 faces stream in the shape set on the Avatar page). */
+  agent?: string;
 }
 
 /**
  * Live lip-synced avatar from Simli. The server hands out a short-lived session token (the API key stays
  * on the server); the browser streams the reply audio and Simli streams back the talking face.
  */
-export function SimliStage({ active, onSink, onError }: Props) {
+export function SimliStage({ active, onSink, onError, agent }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [ready, setReady] = useState(false);
@@ -30,12 +32,14 @@ export function SimliStage({ active, onSink, onError }: Props) {
     (async () => {
       try {
         const [{ SimliClient, LogLevel }, { sessionToken }] = await Promise.all([
-          import('simli-client'), api.simliToken()]);
+          import('simli-client'), api.simliToken(agent)]);
         if (cancelled || !videoRef.current || !audioRef.current) return;
         const c = new SimliClient(sessionToken, videoRef.current, audioRef.current, null, LogLevel.ERROR, 'livekit');
         client = c;
         c.on('stop', () => { if (!cancelled) { setReady(false); onSink(null); } });
         c.on('startup_error', (m: string) => { if (!cancelled) onError(m || 'The live avatar could not start.'); });
+        c.on('error', (m: string) => { if (!cancelled) onError(m || 'The live avatar stopped.'); });
+        c.on('warning', (m: string) => console.warn('Simli:', m));
         await c.start();
         if (cancelled) return void c.stop();
         setReady(true);
@@ -50,7 +54,7 @@ export function SimliStage({ active, onSink, onError }: Props) {
       onSink(null);
       void client?.stop().catch(() => {});
     };
-  }, [active, onSink, onError]);
+  }, [active, onSink, onError, agent]);
 
   return (
     <>

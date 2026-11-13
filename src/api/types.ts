@@ -17,6 +17,12 @@ export interface AvatarConfig {
   /** Admin switch and face for the optional live Simli avatar. */
   simliEnabled?: boolean;
   simliFaceId?: string;
+  /** Trinity-2 stream shape. */
+  simliFormat?: 'square' | 'portrait' | 'landscape';
+  /** Admin only: an agent's own face ID, e.g. { builder: '…' }. */
+  simliFaces?: Record<string, string>;
+  /** Public: agents that have their own live face. */
+  simliAgents?: string[];
   /** Set by the server: true when Simli is configured, so visitors may switch it on. */
   simliAvailable?: boolean;
 }
