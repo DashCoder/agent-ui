@@ -337,3 +337,25 @@ test('a table still arriving shows a spinner instead of jumping columns', async 
   await expect(page.getByTestId('chat-table')).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath('pending-table.png') });
 });
+
+test('Jira ticket keys link to Jira, however the agent writes them', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/');
+  await page.getByRole('textbox').fill('List my last 5 Jira tickets');
+  await page.keyboard.press('Enter');
+  const reply = page.getByTestId('msg-assistant').nth(1);
+  await expect(reply.getByRole('link', { name: 'INA-21' })).toHaveAttribute('href', 'https://inagentic.atlassian.net/browse/INA-21');
+  await expect(reply.getByRole('link', { name: 'INA-20' })).toHaveAttribute('href', 'https://inagentic.atlassian.net/browse/INA-20');
+  await expect(reply.getByRole('link', { name: 'INA-19' })).toHaveCount(0);          // code stays code
+  await expect(reply.locator('code')).toHaveText('INA-19');
+  await expect(reply).toContainText('UTF-8');                                        // not a project
+  const cases = await page.evaluate(async () => {
+    const mod = '/src/components/RichText.tsx';
+    const { linkTickets } = await import(/* @vite-ignore */ mod) as { linkTickets: (t: string, r: object[]) => string };
+    const r = [{ url: 'https://j/browse/{key}', keys: ['INA'] }];
+    return [linkTickets('(INA-7) and INA-8.', r), linkTickets('[INA-9](https://j/browse/INA-9)', r),
+            linkTickets('MINA-3 INA-3x', r), linkTickets('INA-1', [{ url: 'https://j/{key}', keys: ['in a'] }])];
+  });
+  expect(cases).toEqual(['([INA-7](https://j/browse/INA-7)) and [INA-8](https://j/browse/INA-8).',
+    '[INA-9](https://j/browse/INA-9)', 'MINA-3 INA-3x', 'INA-1']);
+});

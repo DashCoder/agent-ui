@@ -1,3 +1,5 @@
+import type { TicketLinks } from '../api/types';
+import { useSiteConfig } from '../hooks/useSiteConfig';
 import type { ReactNode } from 'react';
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -192,7 +194,22 @@ function Block({ text }: { text: string }) {
  * as short labels ("Go to github.com", "Download image") with the full address on hover. File paths the agent
  * mentions become download links (served by agent-api from its allowed folders), with a preview for images.
  */
+/** Ticket keys of known projects (INA-21, also written with a non-breaking hyphen) as [INA-21](…/browse/INA-21);
+ * not inside code, existing links or addresses. */
+export function linkTickets(text: string, rules: TicketLinks[]): string {
+  let out = text;
+  for (const r of rules) {
+    const keys = r.keys.filter((k) => /^[A-Z][A-Z0-9_]{0,19}$/.test(k));
+    if (!keys.length || !r.url.includes('{key}')) continue;
+    const re = new RegExp(`(?<![\\w/\\[#\`.-])(${keys.join('|')})[-\u2010\u2011\u2012\u2013](\\d{1,7})(?![\\w\\]\`])`, 'g');
+    out = out.replace(re, (_m, k: string, n: string) => `[${k}-${n}](${r.url.replace('{key}', `${k}-${n}`)})`);
+  }
+  return out;
+}
+
 export function RichText({ text, streaming = false }: { text: string; streaming?: boolean }) {
+  const { config } = useSiteConfig();
+  const rules = (config.plugins ?? []).flatMap((p) => (p.ticketLinks ? [p.ticketLinks] : []));
   // While a reply is still arriving, a table at its end is held back until it's complete: drawing it row by row
   // makes the columns jump about. A spinner stands in for it.
   const { shown, waiting } = streaming ? holdBackTable(text) : { shown: text, waiting: false };
@@ -201,7 +218,7 @@ export function RichText({ text, streaming = false }: { text: string; streaming?
     <>
       {blocks.map((block, bi) => bi % 2 === 1
         ? <pre key={bi} className="chat-code"><code>{block.replace(/\n$/, '')}</code></pre>
-        : block.trim() && <Block key={bi} text={block} />)}
+        : block.trim() && <Block key={bi} text={rules.length ? linkTickets(block, rules) : block} />)}
       {waiting && (
         <div className="chat-table-pending" role="status" data-testid="table-pending">
           <span className="chat-spinner" aria-hidden="true" />Preparing the table…

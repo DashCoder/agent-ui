@@ -4,7 +4,9 @@ export interface SiteConfig {
   avatar: AvatarConfig;
   quickReplies: string[];
   /** Installed agents, with what they suggest for the chat. */
-  plugins?: { name: string; version: string; agentName?: string; quickReplies?: string[]; assistantHint?: string }[];
+  plugins?: { name: string; version: string; agentName?: string; quickReplies?: string[]; assistantHint?: string;
+    /** Ticket keys of these projects (INA-21) become links: url has {key} in it. */
+    ticketLinks?: TicketLinks }[];
 }
 
 export interface AvatarConfig {
@@ -174,3 +176,5 @@ export interface ModelsOverview {
   agents: AgentModel[]; providers: Record<string, ProviderStatus>; providerNames: Record<string, string>;
   suggestions: Record<string, string[]>; hermes: HermesModel;
 }
+
+export interface TicketLinks { url: string; keys: string[] }

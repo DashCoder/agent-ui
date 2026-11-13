@@ -72,7 +72,8 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
 
     if (path === '/api/config') return json(route, { brand: state.settings.brand, assistant: state.settings.assistant,
       avatar: state.settings.avatar, quickReplies: state.settings.quickReplies,
-      plugins: [{ name: 'demo', version: '1.0.0', quickReplies: ['List my last 5 Jira tickets', 'What are your rates?'] },
+      plugins: [{ name: 'demo', version: '1.0.0', quickReplies: ['List my last 5 Jira tickets', 'What are your rates?'],
+                  ticketLinks: { url: 'https://inagentic.atlassian.net/browse/{key}', keys: ['INA', 'SCRUM'] } },
                 { name: 'kpi', version: '2.0.0', agentName: 'Kai', quickReplies: ['Last 7 days', 'This week', 'Show my scorecard'] }] });
     if (path.startsWith('/api/chat/sessions/s1/messages/') && method === 'DELETE') {
       const mid = path.split('/').pop()!;
@@ -104,6 +105,8 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
         ? 'I have six tools whose names start with `mcp__inagentic__` (two underscores):\n\n1. mcp__inagentic__get_jira_ticket: Reads a Jira ticket.\n2. `mcp__inagentic__propose_pull_request`: Opens a pull request.\n\n- one\n- two'
         : /scorecard/i.test(body.text)
           ? "Here's your scorecard for **the last 7 days (6–12 Nov)**:\n\n**Outreach** 🔴 3% of target\n\n| KPI | Actual / target | Status |\n|---|---|---|\n| **Communications (last 7 days)** | **2 / 75** | 🔴 |\n| ↳ Calls (last 7 days) | 0 / 10 | 🔴 |\n| ↳ Emails (last 7 days) | 2 / 25 | 🔴 |\n\nKeep going!"
+        : /jira tickets/i.test(body.text)     // as Hermes writes it: no links, non-breaking hyphens
+          ? 'INA\u201121 – Update dogrun.ai/en/agentic\u2011ceo page (updated 2026\u201111\u201113)\nINA\u201120 – Pancake Pandas homepage popover\nSee also `INA-19` and UTF-8 and https://x.atlassian.net/browse/INA-18'
         : /preview of/i.test(body.text)
           ? 'INA-25 is ready to look at:\n\nhttp://agent-ui-ina-25.localhost:8088/\n\nTests: 64 passed. Press Accept to open the pull request, or Rebuild.'
         : /content ideas/i.test(body.text)
