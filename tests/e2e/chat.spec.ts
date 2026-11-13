@@ -259,3 +259,12 @@ test('numbered lists count 1, 2, 3 even when the agent writes "1." for every ite
   await expect(lists.nth(1)).toHaveAttribute('start', '4');
   await expect(reply).toContainText('Then a paragraph.');
 });
+
+test('a link to a live preview reads "Open preview v020"', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/');
+  await page.getByRole('textbox').fill('Show me the preview of INA-25');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('msg-assistant').nth(1).getByRole('link', { name: 'Open preview v020' }))
+    .toHaveAttribute('href', 'http://127.0.0.1:8088/v020/');
+});

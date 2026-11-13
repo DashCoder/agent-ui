@@ -1,5 +1,6 @@
 {
   "setup": "npm ci --no-audit --no-fund && npx playwright install chromium",
   "test": "npx playwright test --project desktop --reporter=line",
-  "screenshots": "AGENT_UI_TEST_DIR=tests/preview npx playwright test --project desktop --reporter=line"
+  "screenshots": "AGENT_UI_TEST_DIR=tests/preview npx playwright test --project desktop --reporter=line",
+  "site": "npm run build -- --base \"$PREVIEW_BASE\" --outDir \"$PREVIEW_SITE\" --emptyOutDir"
 }

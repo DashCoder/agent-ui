@@ -6,6 +6,7 @@ import { useChat } from '../hooks/useChat';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { useSpeech } from '../hooks/useSpeech';
 import { load, store } from '../lib/storage';
+import { PLUGINS } from '../plugins';
 import { ApprovalCard } from './ApprovalCard';
 import { AvatarPanel } from './AvatarPanel';
 import type { AudioSink } from './SimliStage';
@@ -23,6 +24,7 @@ interface Props {
 }
 
 const SIDE_KEY = 'agent-ui.sidebar';
+const EXTRAS = PLUGINS.flatMap((p) => (p.messageExtras ? [{ id: p.id, Extras: p.messageExtras }] : []));
 const GROUP_S = 5 * 60;
 
 /**
@@ -198,6 +200,8 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
                              saved={saved.some((s) => s.text === m.text)}
                              onSave={() => void saveReply(m.text)} onCopy={() => void copy(m.text)}
                              onRemove={i === 0 && m.role === 'assistant' || chat.streaming ? undefined : () => void chat.remove(m.id)}>
+                {m.role === 'assistant' && i > 0 && EXTRAS.map(({ id, Extras }) => (
+                  <Extras key={id} text={m.text} send={(t) => send(t)} />))}
                 {m === lastAgent && quickReplies}
               </MessageBubble>
             ))}

@@ -12,4 +12,4 @@ export { Stat } from './pages/admin/Dashboard';
 export { AdminIcon } from './components/AdminIcons';
 export { useAgent } from './pages/admin/agents';
 export { UI_PLUGIN_API } from './plugins/types';
-export type { AgentUIPlugin, AdminPage, AgentInfo, MenuItem, MenuSection, AdminIconName, EventText } from './plugins/types';
+export type { AgentUIPlugin, AdminPage, AgentInfo, MenuItem, MenuSection, AdminIconName, EventText, MessageExtrasProps } from './plugins/types';
