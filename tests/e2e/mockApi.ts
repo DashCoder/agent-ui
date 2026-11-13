@@ -102,6 +102,8 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
         ? 'I have six tools whose names start with `mcp__inagentic__` (two underscores):\n\n1. mcp__inagentic__get_jira_ticket: Reads a Jira ticket.\n2. `mcp__inagentic__propose_pull_request`: Opens a pull request.\n\n- one\n- two'
         : /scorecard/i.test(body.text)
           ? "Here's your scorecard for **the last 7 days (6–12 Nov)**:\n\n**Outreach** 🔴 3% of target\n\n| KPI | Actual / target | Status |\n|---|---|---|\n| **Communications (last 7 days)** | **2 / 75** | 🔴 |\n| ↳ Calls (last 7 days) | 0 / 10 | 🔴 |\n| ↳ Emails (last 7 days) | 2 / 25 | 🔴 |\n\nKeep going!"
+        : /content ideas/i.test(body.text)
+          ? 'Here are three content ideas:\n\n1. Your AI startup is failing because you explain it like an engineer.\n\n1. I tested 47 AI tools\n   so you don\'t have to.\n\n1. Stop building AI features nobody asked for.\n\nThen a paragraph.\n\n4. Restarted at four.\n5. Five.'
         : /long/i.test(body.text) ? Array.from({ length: 40 }, (_, n) => `Line ${n + 1} of a long answer.`).join('\n\n')
         : /rate/i.test(body.text) ? 'Plans start at £49 per month.'
         : /mascot/i.test(body.text)

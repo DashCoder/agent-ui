@@ -245,3 +245,17 @@ test("an agent's own chat (View site from Kai): its name, greeting and quick rep
   await expect(table.locator('tbody tr').nth(1)).toContainText('↳ Calls (last 7 days)0 / 10🔴');
   await expect(page.getByTestId('msg-assistant').last()).toContainText('Keep going!');
 });
+
+test('numbered lists count 1, 2, 3 even when the agent writes "1." for every item with blank lines between', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/');
+  await page.getByRole('textbox').fill('Give me content ideas');
+  await page.keyboard.press('Enter');
+  const reply = page.getByTestId('msg-assistant').nth(1);
+  const lists = reply.locator('ol');
+  await expect(lists).toHaveCount(2);
+  await expect(lists.first().locator('li')).toHaveCount(3);
+  await expect(lists.first().locator('li').nth(1)).toHaveText("I tested 47 AI tools so you don't have to.");
+  await expect(lists.nth(1)).toHaveAttribute('start', '4');
+  await expect(reply).toContainText('Then a paragraph.');
+});

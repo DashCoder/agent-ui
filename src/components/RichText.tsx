@@ -131,7 +131,7 @@ function Block({ text }: { text: string }) {
   const lines = text.split('\n');
   const out: ReactNode[] = [];
   let para: string[] = [];
-  let list: { ordered: boolean; items: string[] } | null = null;
+  let list: { ordered: boolean; start: number; items: string[] } | null = null;
   const flushPara = () => {
     if (para.length) out.push(<p key={out.length}>{para.map((line, j) => <span key={j}>{j > 0 && <br />}{inline(line)}</span>)}</p>);
     para = [];
@@ -139,11 +139,20 @@ function Block({ text }: { text: string }) {
   const flushList = () => {
     if (!list) return;
     const items = list.items.map((it, j) => <li key={j}>{inline(it)}</li>);
-    out.push(list.ordered ? <ol key={out.length}>{items}</ol> : <ul key={out.length}>{items}</ul>);
+    out.push(list.ordered ? <ol key={out.length} start={list.start === 1 ? undefined : list.start}>{items}</ol>
+      : <ul key={out.length}>{items}</ul>);
     list = null;
   };
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
+    if (!line.trim()) {
+      // a blank line ends a paragraph; a list carries on when the next item follows ("loose" list: 1, 2, 3 not 1, 1, 1)
+      flushPara();
+      const next = lines.slice(li + 1).find((l) => l.trim());
+      const same = next && list && (/^\s{2,}\S/.test(next) || (list.ordered ? NUMBER.test(next) : BULLET.test(next) && !NUMBER.test(next)));
+      if (!same) flushList();
+      continue;
+    }
     if (TABLE_ROW.test(line) && TABLE_SEP.test(lines[li + 1] ?? '')) {
       flushPara(); flushList();
       const rows = [line, lines[li + 1]];
@@ -160,7 +169,7 @@ function Block({ text }: { text: string }) {
       const ordered = !!n;
       flushPara();
       if (list && list.ordered !== ordered) flushList();
-      list = list ?? { ordered, items: [] };
+      list = list ?? { ordered, start: n ? Number(line.trim().match(/^\d+/)![0]) : 1, items: [] };
       list.items.push((b || n as RegExpMatchArray)[1]);
     } else if (h) {
       flushPara(); flushList();
@@ -187,7 +196,7 @@ export function RichText({ text }: { text: string }) {
     <>
       {blocks.map((block, bi) => bi % 2 === 1
         ? <pre key={bi} className="chat-code"><code>{block.replace(/\n$/, '')}</code></pre>
-        : block.split(/\n{2,}/).filter((p) => p.trim()).map((p, i) => <Block key={`${bi}-${i}`} text={p} />))}
+        : block.trim() && <Block key={bi} text={block} />)}
     </>
   );
 }
