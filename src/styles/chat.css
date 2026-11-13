@@ -340,3 +340,7 @@
   border-top-color: var(--s-green, #007a5a); animation: chat-spin .8s linear infinite; }
 @keyframes chat-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .chat-spinner { animation-duration: 2.4s; } }
+
+/* a note from an instant command (only this person sees it), lined up with the message text */
+.sl-note > .sl-ephemeral__label { margin: 6px 0 -6px; padding-left: 64px; }
+@container (max-width: 760px) { .sl-note > .sl-ephemeral__label { padding-left: 56px; } }

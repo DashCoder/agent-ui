@@ -345,6 +345,7 @@ test('Jira ticket keys link to Jira, however the agent writes them', async ({ pa
   await page.keyboard.press('Enter');
   const reply = page.getByTestId('msg-assistant').nth(1);
   await expect(reply.getByRole('link', { name: 'INA-21' })).toHaveAttribute('href', 'https://inagentic.atlassian.net/browse/INA-21');
+  await expect(reply.locator('strong').getByRole('link', { name: 'INA-17' })).toBeVisible();      // a link inside bold
   await expect(reply.getByRole('link', { name: 'INA-20' })).toHaveAttribute('href', 'https://inagentic.atlassian.net/browse/INA-20');
   await expect(reply.getByRole('link', { name: 'INA-19' })).toHaveCount(0);          // code stays code
   await expect(reply.locator('code')).toHaveText('INA-19');

@@ -74,7 +74,7 @@ function inline(text: string): ReactNode[] {
       const code = all.slice(1, -1);
       out.push(LOCAL_PATH.test(code) && new RegExp(`^${LOCAL_PATH.source}$`).test(code)
         ? localFile(code, k++) : <code key={k++}>{code}</code>);
-    } else if (m[5]) out.push(<strong key={k++}>{all.slice(2, -2)}</strong>);
+    } else if (m[5]) out.push(<strong key={k++}>{inline(all.slice(2, -2))}</strong>);   // links inside bold work too
     else if (m[6]) out.push(urlLink(all, k++));
     else out.push(localFile(all, k++));
     last = i + all.length;

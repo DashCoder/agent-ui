@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { ChatMessage, SavedReply } from '../api/types';
@@ -45,12 +45,15 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
   const [saveWorkOpen, setSaveWorkOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  // answers from instant commands (e.g. "Build status"): shown after the message that was last when they ran
+  const [notes, setNotes] = useState<{ id: string; text: string; afterId: string | null; at: number }[]>([]);
   // saved replies: open in the sidebar on wide screens, folded away in the strip on phones
   const [savedOpen, setSavedOpen] = useState(() => typeof window === 'undefined' || !window.matchMedia?.('(max-width: 760px)').matches);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastSpoken = useRef<string | null>(null);
   const name = one ? one.agentName ?? agent! : config.assistant.name;
   const quick = one?.quickReplies?.length ? one.quickReplies : config.quickReplies;
+  const instant = PLUGINS.filter((p) => p.chatCommands && (!one || one.name === p.id)).flatMap((p) => p.chatCommands!);
   const embedded = savedPlacement === 'inline';
   useEffect(() => { if (!embedded) document.title = name; }, [name, embedded]);
 
@@ -101,8 +104,18 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
     setNotice(null);
     void chat.send(text, { learn, attachments });
   };
+  const runInstant = async (c: (typeof instant)[number]) => {
+    const id = `note-${Date.now()}`;
+    const afterId = chat.messages[chat.messages.length - 1]?.id ?? null;
+    setNotes((n) => [...n, { id, text: `${c.label}…`, afterId, at: Date.now() / 1000 }]);
+    let text: string;
+    const update = (t: string) => setNotes((n) => n.map((x) => (x.id === id ? { ...x, text: t } : x)));
+    try { text = await c.run(update); } catch (e) { text = `Couldn't get ${c.label.toLowerCase()}: ${(e as Error).message}`; }
+    setNotes((n) => n.map((x) => (x.id === id ? { ...x, text } : x)));
+  };
   const clear = async () => {
     setConfirmClear(false);
+    setNotes([]);
     setNotice(null);
     chat.stop();
     await chat.reset();
@@ -112,10 +125,20 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
   const lastAgent = [...chat.messages].reverse().find((m) => m.role === 'assistant');
   const status = chat.streaming ? 'Replying…' : speech.speaking ? 'Speaking…' : 'Online';
   const commands: Command[] = [
+    ...instant.map((c) => ({ label: c.label, hint: c.hint ?? 'Instant', run: () => void runInstant(c) })),
     ...quick.map((q) => ({ label: q, hint: 'Ask', run: () => send(q) })),
     { label: 'Save my work', hint: 'Link to your email', run: () => setSaveWorkOpen(true) },
     { label: 'Clear chat', hint: 'Start again', run: () => setConfirmClear(true) },
   ];
+  const note = (n: (typeof notes)[number], last: boolean) => (
+    <div key={n.id} className="sl-note" data-testid="chat-note">
+      <p className="sl-ephemeral__label">Only visible to you</p>
+      <MessageBubble role="assistant" text={n.text} time={n.at} name={name} picture={config.avatar.posterUrl}>
+        {EXTRAS.map(({ id, Extras }) => <Extras key={id} text={n.text} send={(t) => send(t)} />)}
+        {last && quickReplies}
+      </MessageBubble>
+    </div>
+  );
   const grouped = (m: ChatMessage, i: number) => {
     const prev = chat.messages[i - 1];
     return !!prev && prev.role === m.role && m.created_at - prev.created_at < GROUP_S;
@@ -124,6 +147,9 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
   const quickReplies = !chat.streaming && !chat.approval && (
     <div className="sl-actions" role="group" aria-label="Suggestions">
       <button type="button" className="sl-btn" onClick={() => setSaveWorkOpen(true)}>🔐 Save my work</button>
+      {instant.map((c) => (
+        <button key={c.label} type="button" className="sl-btn" title={c.hint} onClick={() => void runInstant(c)}>⚡ {c.label}</button>
+      ))}
       {quick.map((q) => (
         <button key={q} type="button" className="sl-btn" onClick={() => send(q)}>{q}</button>
       ))}
@@ -196,16 +222,18 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
           <div className="sl-list" ref={scrollRef} aria-live="polite" data-testid="transcript-box">
             <div className="sl-day"><span>Today</span></div>
             {chat.messages.map((m, i) => (
-              <MessageBubble key={m.id} role={m.role} text={m.text} time={m.created_at} grouped={grouped(m, i)}
+              <Fragment key={m.id}>
+              <MessageBubble role={m.role} text={m.text} time={m.created_at} grouped={grouped(m, i)}
                              name={m.role === 'assistant' ? name : 'You'} picture={config.avatar.posterUrl}
                              saved={saved.some((s) => s.text === m.text)}
                              onSave={() => void saveReply(m.text)} onCopy={() => void copy(m.text)}
                              onRemove={i === 0 && m.role === 'assistant' || chat.streaming ? undefined : () => void chat.remove(m.id)}>
                 {m.role === 'assistant' && i > 0 && EXTRAS.map(({ id, Extras }) => (
                   <Extras key={id} text={m.text} send={(t) => send(t)} />))}
-                {m === lastAgent && quickReplies}
+                {m === lastAgent && !notes.some((n) => n.afterId === m.id) && quickReplies}
               </MessageBubble>
-            ))}
+              {notes.filter((n) => n.afterId === m.id).map((n, j, all) => note(n, m === lastAgent && j === all.length - 1))}
+            </Fragment>))}
             {!lastAgent && quickReplies}
             {chat.streaming && chat.draft && (
               <MessageBubble role="assistant" text={chat.draft} name={name} picture={config.avatar.posterUrl}

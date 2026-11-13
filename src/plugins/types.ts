@@ -73,6 +73,15 @@ export interface AgentUIPlugin {
   /** Version 2: drawn under each of the agent's chat messages, e.g. Accept/Rebuild buttons for a preview link in
    * the text. Render nothing when the message isn't about you. */
   messageExtras?: ComponentType<MessageExtrasProps>;
+  /** Version 2: instant actions in this agent's chat, as a button under the conversation and a / command. They don't
+   * go through the model: run() returns Markdown, shown as a note only this person sees (with messageExtras under it). */
+  chatCommands?: ChatCommand[];
+}
+
+export interface ChatCommand {
+  label: string; hint?: string;
+  /** Returns the note's final Markdown; call update(markdown) to show progress before that (e.g. while a build runs). */
+  run: (update: (markdown: string) => void) => Promise<string>;
 }
 
 /** What a messageExtras component gets: the message text, and a way to send a message in the chat. */
