@@ -27,9 +27,10 @@ test.describe('visitor chat', () => {
     await expect(reply).toHaveText(/Plans start at £49 per month\./);
     await reply.locator('.smsg__text').click();
     await reply.getByRole('button', { name: 'Save reply' }).click();
-    const fold = page.locator('summary', { hasText: 'Saved replies' });
-    if (!(await page.getByTestId('saved-item').first().isVisible().catch(() => false))) await fold.click();
+    const fold = page.locator('summary', { hasText: 'Saved replies (1)' });
+    await expect(fold).toBeAttached();                  // the save has finished before we look
     const saved = page.getByTestId('saved-item');
+    if (!(await saved.first().isVisible())) await fold.click();
     await expect(saved).toHaveCount(1);
     await expect(saved).toContainText('£49');
     await saved.getByRole('button', { name: 'Remove saved reply' }).click();
@@ -260,11 +261,11 @@ test('numbered lists count 1, 2, 3 even when the agent writes "1." for every ite
   await expect(reply).toContainText('Then a paragraph.');
 });
 
-test('a link to a live preview reads "Open preview v020"', async ({ page }) => {
+test('a link to a live preview reads "Open preview <project>-<ticket>"', async ({ page }) => {
   await mockApi(page);
   await page.goto('/');
   await page.getByRole('textbox').fill('Show me the preview of INA-25');
   await page.keyboard.press('Enter');
-  await expect(page.getByTestId('msg-assistant').nth(1).getByRole('link', { name: 'Open preview v020' }))
-    .toHaveAttribute('href', 'http://127.0.0.1:8088/v020/');
+  await expect(page.getByTestId('msg-assistant').nth(1).getByRole('link', { name: 'Open preview agent-ui-ina-25' }))
+    .toHaveAttribute('href', 'http://agent-ui-ina-25.localhost:8088/');
 });

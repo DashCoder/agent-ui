@@ -10,7 +10,7 @@ import './styles/admin.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {/* basename: the same build also runs under a sub-path, e.g. the coding agent's preview at /v020/ */}
+    {/* basename: the same build also runs under a sub-path, e.g. when built with --base /something/ */}
     <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
       <SiteConfigProvider>
         <App />

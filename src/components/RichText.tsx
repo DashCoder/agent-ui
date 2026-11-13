@@ -34,7 +34,7 @@ function SmartLink({ href, label, download }: { href: string; label: string; dow
 function urlLink(url: string, key: number, text?: string) {
   if (IMAGE_EXT.test(url)) return <SmartLink key={key} href={url} label={text ?? 'View image'} />;
   if (FILE_EXT.test(url)) return <SmartLink key={key} href={url} label={text ?? 'Download file'} />;
-  const preview = url.match(/^https?:\/\/[^/]+\/(v\d{1,6}(?:-[a-z0-9]{1,24}){0,2})\/?$/);
+  const preview = url.match(/^https?:\/\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\.localhost(?::\d+)?\/?$/);
   if (preview) return <SmartLink key={key} href={url} label={text ?? `Open preview ${preview[1]}`} />;
   return <SmartLink key={key} href={url} label={text ?? `Go to ${host(url)}`} />;
 }
