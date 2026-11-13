@@ -269,3 +269,58 @@ test('a link to a live preview reads "Open preview <project>-<ticket>"', async (
   await expect(page.getByTestId('msg-assistant').nth(1).getByRole('link', { name: 'Open preview agent-ui-ina-25' }))
     .toHaveAttribute('href', 'http://agent-ui-ina-25.localhost:8088/');
 });
+
+test('while a reply streams, a table is drawn only when it is complete', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/');
+  const cases = await page.evaluate(async () => {
+    const mod = '/src/components/RichText.tsx';   // served by the Vite dev server
+    const { holdBackTable } = await import(/* @vite-ignore */ mod) as {
+      holdBackTable: (t: string) => { shown: string; waiting: boolean } };
+    const head = "Here's your scorecard:\n\n| KPI | Actual |\n|---|---|\n";
+    return {
+      intro: holdBackTable("Here's your score"),
+      header: holdBackTable("Here's your scorecard:\n\n| KPI | Act"),
+      rowEnded: holdBackTable(head + '| Calls | 0 / 10 |\n'),
+      midRow: holdBackTable(head + '| Calls | 0 / 1'),
+      done: holdBackTable(head + '| Calls | 0 / 10 |\n\n'),
+      after: holdBackTable(head + '| Calls | 0 / 10 |\n\nKeep going!'),
+      second: holdBackTable(head + '| Calls | 0 / 10 |\n\nAnd emails:\n\n| KPI |'),
+      code: holdBackTable('```\n| not a table'),
+    };
+  });
+  expect(cases.intro).toEqual({ shown: "Here's your score", waiting: false });
+  expect(cases.header).toEqual({ shown: "Here's your scorecard:", waiting: true });
+  expect(cases.rowEnded).toEqual({ shown: "Here's your scorecard:", waiting: true });     // more rows may come
+  expect(cases.midRow.waiting).toBe(true);
+  expect(cases.done.waiting).toBe(false);                                                   // blank line: complete
+  expect(cases.after.waiting).toBe(false);
+  expect(cases.second.waiting).toBe(true);
+  expect(cases.second.shown).toContain('| Calls | 0 / 10 |');                               // the first is drawn
+  expect(cases.second.shown.endsWith('And emails:')).toBe(true);
+  expect(cases.code.waiting).toBe(false);
+});
+
+test('a table still arriving shows a spinner instead of jumping columns', async ({ page }) => {
+  await mockApi(page);
+  // a reply that is still arriving: the stream stays open, stopped halfway through a table
+  await page.addInitScript(() => {
+    const real = window.fetch;
+    window.fetch = async (input, init) => {
+      if (typeof init?.body === 'string' && init.body.includes('half a scorecard')) {
+        const ev = (e: object) => `event: ${(e as { type: string }).type}\ndata: ${JSON.stringify(e)}\n\n`;
+        const text = "Here's your scorecard:\n\n| KPI | Actual / target | Status |\n|---|---|---|\n| Calls | 0 / 10 | 🔴 |\n";
+        const body = new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(ev({ type: 'delta', text }))); } });
+        return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
+      }
+      return real(input, init);
+    };
+  });
+  await page.goto('/');
+  await page.getByRole('textbox').fill('Show half a scorecard');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('table-pending')).toContainText('Preparing the table');
+  await expect(page.getByText("Here's your scorecard:")).toBeVisible();
+  await expect(page.getByTestId('chat-table')).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('pending-table.png') });
+});

@@ -192,13 +192,36 @@ function Block({ text }: { text: string }) {
  * as short labels ("Go to github.com", "Download image") with the full address on hover. File paths the agent
  * mentions become download links (served by agent-api from its allowed folders), with a preview for images.
  */
-export function RichText({ text }: { text: string }) {
-  const blocks = humanizeTools(text).split(/```[^\n]*\n?([\s\S]*?)```/g);
+export function RichText({ text, streaming = false }: { text: string; streaming?: boolean }) {
+  // While a reply is still arriving, a table at its end is held back until it's complete: drawing it row by row
+  // makes the columns jump about. A spinner stands in for it.
+  const { shown, waiting } = streaming ? holdBackTable(text) : { shown: text, waiting: false };
+  const blocks = humanizeTools(shown).split(/```[^\n]*\n?([\s\S]*?)```/g);
   return (
     <>
       {blocks.map((block, bi) => bi % 2 === 1
         ? <pre key={bi} className="chat-code"><code>{block.replace(/\n$/, '')}</code></pre>
         : block.trim() && <Block key={bi} text={block} />)}
+      {waiting && (
+        <div className="chat-table-pending" role="status" data-testid="table-pending">
+          <span className="chat-spinner" aria-hidden="true" />Preparing the table…
+        </div>
+      )}
     </>
   );
+}
+
+const TABLE_LINE = /^\s*\|/;
+
+/** Split off a table that is still being written at the end of a streaming reply. A table is complete once a line
+ * that isn't part of it follows (usually a blank line). */
+export function holdBackTable(text: string): { shown: string; waiting: boolean } {
+  if ((text.match(/```/g) ?? []).length % 2 === 1) return { shown: text, waiting: false };   // inside code
+  const lines = text.split('\n');
+  let end = lines.length;
+  if (end > 1 && lines[end - 1] === '' && TABLE_LINE.test(lines[end - 2])) end--;   // a row just ended: more may come
+  let start = end;
+  while (start > 0 && TABLE_LINE.test(lines[start - 1])) start--;
+  if (start === end) return { shown: text, waiting: false };
+  return { shown: lines.slice(0, start).join('\n').replace(/\s+$/, ''), waiting: true };
 }

@@ -47,7 +47,7 @@ export function MessageBubble({ role, text, name, picture, time, grouped, pendin
             {time !== undefined && <time className="smsg__time">{clock(time)}</time>}
           </div>
         )}
-        <div className="smsg__text"><RichText text={text} /></div>
+        <div className="smsg__text"><RichText text={text} streaming={pending} /></div>
         {children}
       </div>
       {tools && (
