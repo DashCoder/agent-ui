@@ -79,4 +79,4 @@ export interface AgentUIPlugin {
 export interface MessageExtrasProps { text: string; send: (text: string) => void }
 
 /** One log entry in words: what happened, an optional second line, and whether it was a failure. */
-export interface EventText { what: string; more?: string; failed?: boolean }
+export interface EventText { what: string; more?: string; failed?: boolean; blocked?: boolean }

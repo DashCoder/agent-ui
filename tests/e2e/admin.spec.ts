@@ -256,3 +256,28 @@ test('Model & tools: change Hermes\' model (with rollback) and an agent\'s model
   await a.getByRole('button', { name: 'Test' }).click();
   await expect(a.getByRole('status')).toContainText('answered “OK” in 812 ms');
 });
+
+test('agent logs: OpenRouter traces, blocked calls stand out, and a filter for problems', async ({ page }) => {
+  await mockApi(page, { loggedIn: true });
+  const now = () => Date.now() / 1000;
+  await page.route((u) => u.pathname === '/api/admin/activity', (route) => route.fulfill({ json: { items: [
+      { id: 't3', ts: now() - 30, actor: 'openrouter', action: 'openrouter.trace', target: 'openai/gpt-4o',
+        detail: { plugin: 'builder', model: 'openai/gpt-4o', statusCode: 403, error: 'Input was flagged',
+                  blocked: "OpenRouter's moderation refused the request (Input was flagged)", ms: 300 } },
+      { id: 't2', ts: now() - 40, actor: 'openrouter', action: 'openrouter.trace', target: 'qwen/qwen3-coder',
+        detail: { plugin: 'builder', model: 'qwen/qwen3-coder', provider: 'Alibaba', tokensIn: 1200, tokensOut: 340,
+                  cost: 0.0123, ms: 3200, finish: 'stop' } },
+      { id: 't1', ts: now() - 50, actor: 'builder', action: 'llm.call', target: 'qwen/qwen3-coder',
+        detail: { plugin: 'builder', provider: 'openrouter', ms: 3300, tokensIn: 1200, tokensOut: 340 } }] } }));
+  await page.goto('/admin/logs?agent=demo');
+  await expect(page.getByTestId('traces-status')).toContainText('via the relay, checked every 30 s');
+  await expect(page.getByTestId('traces-status')).toContainText('3 received');
+  const rows = page.getByTestId('audit-row');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0).getByTestId('blocked')).toBeVisible();
+  await expect(rows.nth(0)).toContainText("Blocked: OpenRouter's moderation refused the request");
+  await expect(rows.nth(1)).toContainText('OpenRouter: qwen/qwen3-coder');
+  await expect(rows.nth(1)).toContainText('via Alibaba · 3.2 s · 1200 → 340 tokens · $0.0123');
+  await page.getByRole('checkbox', { name: 'Only failed or blocked' }).check();
+  await expect(rows).toHaveCount(1);
+});

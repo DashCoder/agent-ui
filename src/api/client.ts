@@ -112,6 +112,8 @@ export const api = {
   conversation: (id: string) => request<{ messages: ConversationMessage[] }>(`/api/admin/conversations/${id}`),
   usage: (agent = 'all') => request<Usage>(`/api/admin/usage?agent=${encodeURIComponent(agent)}`),
   models: () => request<ModelsOverview>('/api/admin/models'),
+  openrouterTraces: () => request<{ mode: 'relay' | 'push' | null; received: number; lastAt: number | null;
+    lastPull: number | null; lastError: string | null; intervalS: number | null }>('/api/admin/openrouter-traces'),
   saveModel: (agent: string, provider: string, model: string) =>
     request<{ current?: ModelChoice; label?: string; ok?: boolean; steps?: string[]; error?: string; hermes?: HermesModel }>(
       `/api/admin/models/${encodeURIComponent(agent)}`, { method: 'PUT', body: json({ provider, model }) }),

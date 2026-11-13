@@ -139,19 +139,27 @@ function Transcript({ id }: { id: string }) {
 function Actions({ agentId, name }: { agentId: string; name: string }) {
   const [items, setItems] = useState<AuditEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [problemsOnly, setProblemsOnly] = useState(false);
   useEffect(() => {
     setItems(null);
     api.activity(agentId, 300).then((r) => setItems(r.items)).catch((e) => setError((e as Error).message));
   }, [agentId]);
+  const shown = problemsOnly ? items?.filter((e) => explain(e).failed) : items;
   return (
     <>
       {error && <p className="form-error" role="alert">{error}</p>}
+      <div className="row" style={{ justifyContent: 'space-between', margin: '0 0 10px', gap: 12, flexWrap: 'wrap' }}>
+        <TracesStatus />
+        <label className="small" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+          <input type="checkbox" checked={problemsOnly} onChange={(e) => setProblemsOnly(e.target.checked)} style={{ width: 'auto' }} />
+          Only failed or blocked</label>
+      </div>
       <div className="tbl-wrap">
         <table className="tbl" style={{ minWidth: 640 }}>
           <colgroup><col style={{ width: 112 }} /><col style={{ width: 90 }} /><col /></colgroup>
           <thead><tr><th scope="col">Time</th><th scope="col">Who</th><th scope="col">What happened</th></tr></thead>
           <tbody>
-            {items?.map((e) => {
+            {shown?.map((e) => {
               const t = explain(e);
               return (
                 <tr key={e.id} data-testid="audit-row" className={t.failed ? 'row--failed' : undefined}>
@@ -159,7 +167,9 @@ function Actions({ agentId, name }: { agentId: string; name: string }) {
                   <td>{who(e.actor)}</td>
                   <td style={{ overflowWrap: 'anywhere' }}>
                     {e.action === 'mcp.call' && <span className="status status--accent" style={{ marginRight: 6 }}>Tool call</span>}
-                    {t.failed && <span className="status status--bad" style={{ marginRight: 6 }}>Failed</span>}
+                    {e.action === 'openrouter.trace' && <span className="status status--muted" style={{ marginRight: 6 }}>Trace</span>}
+                    {t.blocked ? <span className="status status--bad" style={{ marginRight: 6 }} data-testid="blocked">Blocked</span>
+                      : t.failed && <span className="status status--bad" style={{ marginRight: 6 }}>Failed</span>}
                     <span className="log__what">{t.what}</span>
                     {t.more && <div className="small muted" style={{ marginTop: 2 }}>{t.more}</div>}
                   </td>
@@ -172,5 +182,25 @@ function Actions({ agentId, name }: { agentId: string; name: string }) {
       {items === null && !error && <p className="muted small">Loading…</p>}
       {items?.length === 0 && <p className="muted" style={{ margin: '16px 0 0' }}>Nothing yet — what {name} does will appear here.</p>}
     </>
+  );
+}
+
+/** Whether OpenRouter's traces (its Observability → Broadcast webhook) are arriving, and from where. */
+function TracesStatus() {
+  const [st, setSt] = useState<Awaited<ReturnType<typeof api.openrouterTraces>> | null>(null);
+  useEffect(() => { api.openrouterTraces().then(setSt).catch(() => {}); }, []);
+  if (!st) return <span />;
+  if (!st.mode) {
+    return <span className="small muted" data-testid="traces-status">OpenRouter traces aren’t connected: see “OpenRouter traces”
+      in agent-api’s README to see each OpenRouter call (and anything it blocked) here.</span>;
+  }
+  const ago = (t: number | null) => (t ? `${Math.max(1, Math.round((Date.now() / 1000 - t) / 60))} min ago` : 'not yet');
+  return (
+    <span className="small" data-testid="traces-status">
+      <span className={`status status--${st.lastError ? 'bad' : 'ok'}`} style={{ marginRight: 6 }}>OpenRouter traces</span>
+      {st.mode === 'relay' ? `via the relay, checked every ${st.intervalS} s · last check ${ago(st.lastPull)}` : 'pushed to agent-api'}
+      {' · '}{st.received} received since the last restart{st.lastAt ? ` (latest ${ago(st.lastAt)})` : ''}
+      {st.lastError && <span style={{ color: 'var(--adm-danger)' }}> · {st.lastError}</span>}
+    </span>
   );
 }

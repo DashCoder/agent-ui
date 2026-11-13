@@ -5,7 +5,7 @@ import { humanize } from './humanize';
 
 export { humanize };
 
-const WHO: Record<string, string> = { hermes: 'Hermes', agent: 'Agent', github: 'GitHub', unknown: 'Unknown' };
+const WHO: Record<string, string> = { hermes: 'Hermes', agent: 'Agent', github: 'GitHub', openrouter: 'OpenRouter', unknown: 'Unknown' };
 export const who = (actor: string) => WHO[actor] ?? actor;
 
 const ms = (n: unknown) => (typeof n === 'number' ? (n >= 1000 ? `${(n / 1000).toFixed(1)} s` : `${n} ms`) : '');
@@ -21,8 +21,21 @@ export function explain(e: AuditEvent): EventText {
     const parts = [d.task ? `for ${String(d.task)}` : '', ms(d.ms),
       d.tokensIn !== undefined ? `${d.tokensIn} → ${d.tokensOut ?? '?'} tokens` : '',
       typeof d.cost === 'number' ? `$${d.cost.toFixed(4)}` : d.provider === 'ollama' ? 'free (local)' : ''].filter(Boolean);
-    return { what: `Model: ${e.target}${d.provider ? ` (${String(d.provider)})` : ''}`, failed: !!d.error,
-             more: [d.error ? `Failed: ${String(d.error)}` : '', parts.join(' · ')].filter(Boolean).join(' — ') || undefined };
+    return { what: `Model: ${e.target}${d.provider ? ` (${String(d.provider)})` : ''}`, failed: !!d.error || !!d.blocked,
+             blocked: !!d.blocked,
+             more: [d.blocked ? `Blocked: ${String(d.blocked)}` : d.error ? `Failed: ${String(d.error)}` : '',
+                    parts.join(' · ')].filter(Boolean).join(' — ') || undefined };
+  }
+  if (e.action === 'openrouter.trace') {
+    const parts = [d.provider ? `via ${String(d.provider)}` : '', ms(d.ms),
+      d.tokensIn !== undefined ? `${d.tokensIn} → ${d.tokensOut ?? '?'} tokens` : '',
+      typeof d.cost === 'number' ? `$${d.cost.toFixed(4)}` : '',
+      typeof d.ttftMs === 'number' ? `first token after ${ms(d.ttftMs)}` : '',
+      d.finish && d.finish !== 'stop' ? `ended: ${String(d.finish)}` : '',
+      d.apiKey ? `key “${String(d.apiKey)}”` : ''].filter(Boolean);
+    const problem = d.blocked ? `Blocked: ${String(d.blocked)}` : d.error ? `Error${d.statusCode ? ` ${String(d.statusCode)}` : ''}: ${String(d.error)}` : '';
+    return { what: `OpenRouter: ${e.target}`, failed: !!d.blocked || !!d.error, blocked: !!d.blocked,
+             more: [problem, parts.join(' · ')].filter(Boolean).join(' — ') || undefined };
   }
   if (e.action === 'models.set') {
     return { what: `Model changed to ${String(d.model)} (${String(d.provider)})`, more: d.before ? `was ${String(d.before)}` : undefined };

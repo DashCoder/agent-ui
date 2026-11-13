@@ -173,6 +173,8 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
       skills: [{ name: 'book-appointment', description: 'Books a slot' }], dashboardUrl: 'https://mac-mini.tailnet.ts.net:9119',
       configured: { model: 'anthropic/claude-sonnet-4.5', provider: 'openrouter' },
     });
+    if (path === '/api/admin/openrouter-traces')
+      return json(route, { mode: 'relay', received: 3, lastAt: now() - 120, lastPull: now() - 20, lastError: null, intervalS: 30 });
     if (path === '/api/admin/activity') return json(route, { items: [
       { id: 'e2', ts: now() - 60, actor: 'hermes', action: 'mcp.call', target: 'add_note', detail: { plugin: 'demo' } },
       { id: 'e1', ts: now() - 120, actor: 'agent', action: 'pr.proposed', target: 'DashCoder/agent-api#7', detail: { files: 2 } }] });
