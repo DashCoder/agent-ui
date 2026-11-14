@@ -9,6 +9,7 @@ import { PLUGIN_ADMIN_PAGES } from './plugins';
 import { Calendar } from './pages/admin/Calendar';
 import { Dashboard } from './pages/admin/Dashboard';
 import { Hermes } from './pages/admin/Hermes';
+import { KeysPage } from './pages/admin/KeysPage';
 import { Knowledge } from './pages/admin/Knowledge';
 import { Phone } from './pages/admin/Phone';
 import { PluginsPage } from './pages/admin/PluginsPage';
@@ -38,6 +39,7 @@ export function App() {
         <Route path="usage" element={<UsagePage />} />
         <Route path="plugins" element={<PluginsPage />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="keys" element={<KeysPage />} />
         <Route path="builder" element={<Moved to="agent" />} />
         <Route path="hermes" element={<Moved to="model" />} />
         <Route path="audit" element={<Moved to="logs" />} />

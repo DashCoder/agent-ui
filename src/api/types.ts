@@ -178,3 +178,11 @@ export interface ModelsOverview {
 }
 
 export interface TicketLinks { url: string; keys: string[] }
+
+/** Settings & keys: optional settings stored encrypted on this server. Secret values are never sent back. */
+export interface OptionItem {
+  name: string; label: string; help: string; secret: boolean; placeholder: string; test: string | null;
+  set: boolean; source: 'admin' | 'server' | null; pending: boolean; value?: string;
+}
+export interface OptionGroup { id: string; title: string; items: OptionItem[] }
+export interface OptionsList { groups: OptionGroup[]; restarting?: boolean }

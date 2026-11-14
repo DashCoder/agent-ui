@@ -46,7 +46,7 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   // answers from instant commands (e.g. "Build status"): shown after the message that was last when they ran
-  const [notes, setNotes] = useState<{ id: string; text: string; afterId: string | null; at: number }[]>([]);
+  const [notes, setNotes] = useState<{ id: string; text: string; afterId: string | null; at: number; label?: string }[]>([]);
   // saved replies: open in the sidebar on wide screens, folded away in the strip on phones
   const [savedOpen, setSavedOpen] = useState(() => typeof window === 'undefined' || !window.matchMedia?.('(max-width: 760px)').matches);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -107,7 +107,9 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
   const runInstant = async (c: (typeof instant)[number]) => {
     const id = `note-${Date.now()}`;
     const afterId = chat.messages[chat.messages.length - 1]?.id ?? null;
-    setNotes((n) => [...n, { id, text: `${c.label}…`, afterId, at: Date.now() / 1000 }]);
+    // pressing it again replaces its earlier note (when nothing was said since) instead of stacking copies
+    setNotes((n) => [...n.filter((x) => !(x.label === c.label && x.afterId === afterId)),
+      { id, text: `${c.label}…`, afterId, at: Date.now() / 1000, label: c.label }]);
     let text: string;
     const update = (t: string) => setNotes((n) => n.map((x) => (x.id === id ? { ...x, text: t } : x)));
     try { text = await c.run(update); } catch (e) { text = `Couldn't get ${c.label.toLowerCase()}: ${(e as Error).message}`; }

@@ -292,3 +292,39 @@ test("avatar page: an agent's own Simli face and the Trinity-2 video shape", asy
   expect(state.settings.avatar.simliFaces).toEqual({ kpi: '1c318dfa-33e7-4f5d-9a3d-5c2e1636ca7c' });
   expect(state.settings.avatar.simliFormat).toBe('portrait');
 });
+
+test('Settings & keys: connect Jira with a test, secrets never come back, change the admin password', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  await page.goto('/admin/keys');
+  await expect(page.getByTestId('keys-summary')).toContainText('Nothing connected yet');
+  const jira = page.getByTestId('keys-jira');
+  await jira.getByRole('textbox', { name: /^Jira address/ }).fill('https://acme.atlassian.net');
+  await jira.getByRole('textbox', { name: /^Jira API token/ }).fill('bad');
+  await jira.getByRole('button', { name: 'Test' }).click();
+  await expect(jira.getByTestId('keys-test')).toContainText('✗ Jira said 401');
+  await jira.getByRole('textbox', { name: /^Jira API token/ }).fill('good');
+  await jira.getByRole('button', { name: 'Test' }).click();
+  await expect(jira.getByTestId('keys-test')).toContainText('✓ Signed in as Axel');
+  await jira.getByRole('button', { name: 'Save' }).click();
+  expect(state.lastOptions.values).toEqual({ JIRA_BASE_URL: 'https://acme.atlassian.net', JIRA_API_TOKEN: 'good' });
+  await expect(page.getByTestId('keys-summary')).toContainText('2 settings in use');
+  // the token field is empty again (never sent back), with a way to replace or remove it
+  await expect(jira.getByRole('textbox', { name: /^Jira API token/ })).toHaveValue('');
+  await expect(jira.getByRole('textbox', { name: /^Jira API token/ })).toHaveAttribute('placeholder', /type to replace/);
+  await expect(jira.getByRole('textbox', { name: /^Jira address/ })).toHaveValue('https://acme.atlassian.net');
+  await jira.getByRole('button', { name: 'Remove Jira API token' }).click();
+  expect(state.lastOptions.remove).toEqual(['JIRA_API_TOKEN']);
+  await expect(page.getByTestId('keys-summary')).toContainText('1 setting in use');
+
+  const pw = page.getByTestId('change-password');
+  await pw.getByLabel('Current password').fill('secret');
+  await pw.getByLabel('New password', { exact: true }).fill('short');
+  await pw.getByLabel('New password again').fill('short');
+  await pw.getByRole('button', { name: 'Change password' }).click();
+  await expect(pw.getByRole('alert')).toContainText('12 characters');
+  await pw.getByLabel('New password', { exact: true }).fill('a-much-longer-password');
+  await pw.getByLabel('New password again').fill('a-much-longer-password');
+  await pw.getByRole('button', { name: 'Change password' }).click();
+  await expect(pw.getByRole('status')).toContainText('Password changed');
+  expect(state.password).toBe('a-much-longer-password');
+});

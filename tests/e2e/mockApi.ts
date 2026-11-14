@@ -20,6 +20,10 @@ export interface MockState {
   hermes: any;
   /** The agent the last live-avatar token was asked for. */
   simliAgent?: string | null;
+  /** Settings & keys: what's stored (name → value) and the last save. */
+  options?: Record<string, string>;
+  lastOptions?: any;
+  password?: string;
 }
 
 export const SITE = {
@@ -215,6 +219,29 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
       const a = state.models.find((x: any) => x.id === mm[1]);
       a.current = { provider: body.provider, model: body.model }; a.label = label(body.provider, body.model);
       return json(route, { current: a.current, label: a.label });
+    }
+    if (path === '/api/admin/options' || path === '/api/admin/options/test' || path === '/api/admin/password') {
+      const o = (state.options ??= {});
+      if (path === '/api/admin/password') {
+        if (body.current !== (state.password ?? 'secret')) return json(route, { detail: "The current password isn't right" }, 400);
+        state.password = body.new; return json(route, { ok: true });
+      }
+      if (path.endsWith('/test')) {
+        const token = body.values?.JIRA_API_TOKEN || o.JIRA_API_TOKEN;
+        return json(route, token === 'good' ? { ok: true, message: 'Signed in as Axel' } : { ok: false, message: 'Jira said 401' });
+      }
+      if (method === 'PUT') {
+        state.lastOptions = body;
+        Object.entries(body.values ?? {}).forEach(([k, v]) => { if (v) o[k] = v as string; else delete o[k]; });
+        (body.remove ?? []).forEach((k: string) => delete o[k]);
+      }
+      const it = (name: string, label: string, secret: boolean, test: string | null = null) => ({
+        name, label, secret, test, help: `${label} help`, placeholder: '', set: !!o[name], source: o[name] ? 'admin' : null,
+        pending: false, ...(secret ? {} : { value: o[name] ?? '' }) });
+      return json(route, { restarting: method === 'PUT', groups: [
+        { id: 'models', title: 'AI models', items: [it('OPENROUTER_API_KEY', 'OpenRouter API key', true, 'openrouter')] },
+        { id: 'jira', title: 'Jira', items: [it('JIRA_BASE_URL', 'Jira address', false, 'jira'), it('JIRA_API_TOKEN', 'Jira API token', true, 'jira')] },
+      ] });
     }
     if (path === '/api/admin/plugins') return json(route, { plugins: state.plugins, jobs: state.jobs,
       sources: ['github.com/DashCoder'], installerReady: state.installerReady });

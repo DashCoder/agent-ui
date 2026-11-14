@@ -12,7 +12,7 @@ export interface Agent extends AgentInfo {
 }
 
 /** Core pages any agent's menu can link to; they show that agent's part when one is picked (?agent=…). */
-export const SHARED = ['logs', 'usage', 'plugins', 'settings', 'knowledge', 'agent', 'avatar', 'model', 'phone', 'calendar'];
+export const SHARED = ['logs', 'usage', 'plugins', 'settings', 'keys', 'knowledge', 'agent', 'avatar', 'model', 'phone', 'calendar'];
 
 const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -25,6 +25,7 @@ const TAIL: MenuSection[] = [
   { title: 'Account', items: [
     { to: 'usage', label: 'Usage & costs', icon: 'billing' },
     { to: 'plugins', label: 'Plugins', icon: 'plugin' },
+    { to: 'keys', label: 'Settings & keys', icon: 'key' },
     { to: 'settings', label: 'Settings', icon: 'settings' },
   ] },
 ];
