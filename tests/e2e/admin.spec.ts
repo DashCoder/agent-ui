@@ -352,3 +352,14 @@ test('Settings & keys: connect Jira with a test, secrets never come back, change
   await expect(pw.getByRole('status')).toContainText('Password changed');
   expect(state.password).toBe('a-much-longer-password');
 });
+
+test('avatar page: the clips can be set not to play by themselves', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  await page.goto('/admin/avatar');
+  const auto = page.getByRole('checkbox', { name: /Play the clips as soon as the page opens/ });
+  await expect(auto).toBeChecked();
+  await auto.uncheck();
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  expect(state.settings.avatar.autoplay).toBe(false);
+});

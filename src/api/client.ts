@@ -60,7 +60,8 @@ export const api = {
   deleteMessage: (sessionId: string, id: string) =>
     request<{ removed: string[] }>(`/api/chat/sessions/${sessionId}/messages/${id}`, { method: 'DELETE' }),
   messages: (sessionId: string) => request<{ messages: ChatMessage[] }>(`/api/chat/sessions/${sessionId}/messages`),
-  async stream(sessionId: string, body: { text: string; learn: boolean; attachments: string[]; agent?: string },
+  async stream(sessionId: string, body: { text: string; learn: boolean; attachments: string[]; agent?: string;
+                                          model?: 'local' | 'openrouter' },
                onEvent: (e: StreamEvent) => void, signal?: AbortSignal) {
     const res = await fetch(`${BASE}/api/chat/sessions/${sessionId}/stream`, {
       method: 'POST', credentials: 'include', signal,

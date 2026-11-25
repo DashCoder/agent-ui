@@ -9,7 +9,8 @@ export interface MockState {
   saved: { id: string; text: string; created_at: number }[];
   settings: Record<string, any>;
   knowledge: { id: string; kind: string; value: string; created_at: number }[];
-  lastSend?: { text: string; learn: boolean; agent?: string };
+  lastSend?: { text: string; learn: boolean; agent?: string; model?: string };
+  chatModels?: string[];
   sessionAgent?: string;
   plugins: any[];
   jobs: any[];
@@ -75,7 +76,7 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
     const body = req.postData() ? (() => { try { return JSON.parse(req.postData()!); } catch { return {}; } })() : {};
 
     if (path === '/api/config') return json(route, { brand: state.settings.brand, assistant: state.settings.assistant,
-      avatar: state.settings.avatar, quickReplies: state.settings.quickReplies,
+      avatar: state.settings.avatar, quickReplies: state.settings.quickReplies, chatModels: state.chatModels ?? [],
       plugins: [{ name: 'demo', version: '1.0.0', quickReplies: ['List my last 5 Jira tickets', 'What are your rates?'],
                   ticketLinks: { url: 'https://inagentic.atlassian.net/browse/{key}', keys: ['INA', 'SCRUM'] } },
                 { name: 'kpi', version: '2.0.0', agentName: 'Kai', quickReplies: ['Last 7 days', 'This week', 'Show my scorecard'] }] });
@@ -95,7 +96,7 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
     }
     if (path.endsWith('/messages')) return json(route, {}, 404);
     if (path.endsWith('/stream')) {
-      state.lastSend = { text: body.text, learn: body.learn, agent: body.agent };
+      state.lastSend = { text: body.text, learn: body.learn, agent: body.agent, model: body.model };
       const user = { id: id(), role: 'user', text: body.text, created_at: now() };
       const answerId = id();
       state.log.push({ id: user.id, role: 'user' }, { id: answerId, role: 'assistant' });

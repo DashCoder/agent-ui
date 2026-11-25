@@ -22,7 +22,8 @@ export const VOICES: { id: string; label: string }[] = [
 
 export function AvatarSettings() {
   const { settings, save, status, error } = useSettings();
-  const [form, setForm] = useState({ posterUrl: '', idle: '', talk: '', speakReplies: false, voice: 'en-GB-RyanNeural',
+  const [form, setForm] = useState({ posterUrl: '', idle: '', talk: '', speakReplies: false, autoplay: true,
+    voice: 'en-GB-RyanNeural',
     simliEnabled: false, simliFaceId: '', simliFormat: 'square' as NonNullable<AvatarConfig['simliFormat']>,
     simliFaces: {} as Record<string, string> });
   const { config } = useSiteConfig();
@@ -34,13 +35,13 @@ export function AvatarSettings() {
     if (!settings) return;
     const a = settings.avatar;
     setForm({ posterUrl: a.posterUrl, idle: a.idleVideos.join('\n'), talk: a.talkVideos.join('\n'),
-              speakReplies: a.speakReplies, voice: a.voice || 'en-GB-RyanNeural',
+              speakReplies: a.speakReplies, autoplay: a.autoplay !== false, voice: a.voice || 'en-GB-RyanNeural',
               simliEnabled: !!a.simliEnabled, simliFaceId: a.simliFaceId ?? '', simliFormat: a.simliFormat ?? 'square',
               simliFaces: { ...(a.simliFaces ?? {}) } });
   }, [settings]);
 
   const preview: AvatarConfig = { posterUrl: form.posterUrl, idleVideos: lines(form.idle),
-                                  talkVideos: lines(form.talk), speakReplies: form.speakReplies,
+                                  talkVideos: lines(form.talk), speakReplies: form.speakReplies, autoplay: form.autoplay,
                                   voice: form.voice, simliEnabled: form.simliEnabled,
                                   simliFaceId: form.simliFaceId.trim(), simliFormat: form.simliFormat,
                                   simliFaces: Object.fromEntries(Object.entries(form.simliFaces).map(([k, v]) => [k, v.trim()])) };
@@ -67,6 +68,11 @@ export function AvatarSettings() {
           <label className="field"><span>Talking clips — one URL per line</span>
             <textarea rows={3} value={form.talk} onChange={(e) => setForm({ ...form, talk: e.target.value })}
                       placeholder="/avatar/talk_1.mp4" />
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={form.autoplay}
+                   onChange={(e) => setForm({ ...form, autoplay: e.target.checked })} />
+            Play the clips as soon as the page opens (without sound; the play button adds the voice)
           </label>
           <label className="check">
             <input type="checkbox" checked={form.speakReplies}
@@ -122,7 +128,7 @@ export function AvatarSettings() {
           <AvatarPanel avatar={preview} talking={previewTalking} compact />
           <label className="check" style={{ marginTop: 12 }}>
             <input type="checkbox" checked={previewTalking} onChange={(e) => setPreviewTalking(e.target.checked)} />
-            Preview talking state (press play first)
+            Preview talking state
           </label>
         </div>
         <ClipUpload onAdded={(r) => setForm((f) => {

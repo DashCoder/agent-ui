@@ -17,7 +17,16 @@ interface Props {
   commands?: Command[];
   learn: boolean;
   onLearn: (on: boolean) => void;
+  /** Chat without Hermes: which model answers (shown when there's more than one). */
+  models?: ('local' | 'openrouter')[];
+  model?: 'local' | 'openrouter';
+  onModel?: (m: 'local' | 'openrouter') => void;
 }
+
+const MODEL_INFO = {
+  local: { label: 'Local', title: 'Private: answered on this server (slower)' },
+  openrouter: { label: 'OpenRouter', title: 'Faster: answered by a cloud model via OpenRouter (the message leaves this server)' },
+} as const;
 
 interface Attachment { id: string; filename: string }
 
@@ -33,7 +42,8 @@ const Speech: SpeechCtor | undefined = typeof window !== 'undefined'
   : undefined;
 
 /** Slack-style message box: formatting toolbar, the text, then attach · Aa · emoji · @ · voice · / and Send. */
-export function Composer({ assistantName, disabled, streaming, onSend, onStop, commands = [], learn, onLearn }: Props) {
+export function Composer({ assistantName, disabled, streaming, onSend, onStop, commands = [], learn, onLearn,
+                          models = [], model, onModel }: Props) {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -213,6 +223,14 @@ export function Composer({ assistantName, disabled, streaming, onSend, onStop, c
           <button type="button" className={`sl-icon ${showSlash ? 'is-on' : ''}`} aria-label="Shortcuts" title="Shortcuts"
                   aria-expanded={showSlash} onClick={() => setMenu(showSlash ? null : 'slash')}><SlashIcon /></button>
           <span className="sl-composer__spacer" />
+          {models.length > 1 && onModel && (
+            <div className="sl-model" role="radiogroup" aria-label="Model">
+              {models.map((m) => (
+                <button key={m} type="button" role="radio" aria-checked={model === m} title={MODEL_INFO[m].title}
+                        className={model === m ? 'is-on' : ''} onClick={() => onModel(m)}>{MODEL_INFO[m].label}</button>
+              ))}
+            </div>
+          )}
           <label className="sl-learn" title={learn ? 'On: remembers useful answers' : 'Off: faster replies'}>
             <input type="checkbox" checked={learn} onChange={(e) => onLearn(e.target.checked)} aria-label="Learn and improve" />
             <span className="sl-learn__track" aria-hidden="true" /><span>Learn</span>

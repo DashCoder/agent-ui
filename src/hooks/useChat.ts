@@ -23,7 +23,7 @@ export interface ChatState {
   error: string | null;
   /** The server said this browser has to sign in (or use a trusted email) to chat. */
   needsSignIn: boolean;
-  send: (text: string, opts: { learn: boolean; attachments?: string[] }) => Promise<void>;
+  send: (text: string, opts: { learn: boolean; attachments?: string[]; model?: 'local' | 'openrouter' }) => Promise<void>;
   answerApproval: (approve: boolean) => Promise<void>;
   stop: () => void;
   reset: () => Promise<void>;
@@ -79,7 +79,7 @@ export function useChat(ready = true, agent?: string): ChatState {
     return () => { cancelled = true; };
   }, [ready, agent]);
 
-  const send = useCallback(async (text: string, opts: { learn: boolean; attachments?: string[] }) => {
+  const send = useCallback(async (text: string, opts: { learn: boolean; attachments?: string[]; model?: 'local' | 'openrouter' }) => {
     const trimmed = text.trim();
     if (!trimmed || streaming) return;
     setError(null);
@@ -95,7 +95,7 @@ export function useChat(ready = true, agent?: string): ChatState {
     let acc = '';
     try {
       const sid = sessionId ?? (await startNew());
-      await api.stream(sid, { text: trimmed, learn: opts.learn, attachments: opts.attachments ?? [], agent }, (ev) => {
+      await api.stream(sid, { text: trimmed, learn: opts.learn, attachments: opts.attachments ?? [], agent, model: opts.model }, (ev) => {
         switch (ev.type) {
           case 'start':
             setMessages((m) => m.map((x) => (x.id === optimistic.id ? ev.userMessage : x)));

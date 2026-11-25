@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { mockApi, SITE } from './mockApi';
 
@@ -383,4 +384,42 @@ test('when the agents need a signed-in person, the chat offers sign-in by email 
   await box.locator('button[type=submit]').click();
   await expect(page.getByRole('status')).toContainText('Signed in as axel@inagentic.ai. Send your message again.');
   await expect(page.getByTestId('chat-sign-in')).toHaveCount(0);
+});
+
+
+test('the chat box picks Local or OpenRouter, and remembers it', async ({ page }) => {
+  const state = await mockApi(page, { chatModels: ['local', 'openrouter'] });
+  await page.goto('/');
+  const pick = page.getByRole('radiogroup', { name: 'Model' });
+  await expect(pick.getByRole('radio', { name: 'Local' })).toHaveAttribute('aria-checked', 'true');
+  await pick.getByRole('radio', { name: 'OpenRouter' }).click();
+  await page.getByRole('button', { name: 'What are your rates?' }).click();
+  await expect(page.getByTestId('msg-assistant').nth(1)).toHaveText(/Plans start at £49/);
+  expect(state.lastSend?.model).toBe('openrouter');
+  await page.reload();
+  await expect(page.getByRole('radiogroup', { name: 'Model' }).getByRole('radio', { name: 'OpenRouter' }))
+    .toHaveAttribute('aria-checked', 'true');
+});
+
+test('no model switch when only one model is available', async ({ page }) => {
+  await mockApi(page, { chatModels: ['local'] });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Send' })).toBeVisible();
+  await expect(page.getByRole('radiogroup', { name: 'Model' })).toHaveCount(0);
+});
+
+test('uploaded clips play by themselves unless the admin turns that off', async ({ page }) => {
+  const clip = readFileSync(new URL('./fixtures/clip.webm', import.meta.url));
+  await page.route('**/clips/idle.webm', (route) => route.fulfill({ status: 200, contentType: 'video/webm', body: clip }));
+  const state = await mockApi(page);
+  state.settings.avatar = { ...state.settings.avatar, idleVideos: ['/clips/idle.webm'] };
+  await page.goto('/');
+  const video = page.locator('video.avatar__clip').first();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused && v.currentTime > 0)).toBe(true);
+  await expect(page.getByRole('button', { name: 'Play avatar and voice' })).toBeVisible();   // voice is still opt-in
+
+  state.settings.avatar = { ...state.settings.avatar, autoplay: false };
+  await page.reload();
+  await page.waitForTimeout(800);
+  expect(await page.locator('video.avatar__clip').first().evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
 });

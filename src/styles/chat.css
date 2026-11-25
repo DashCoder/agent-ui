@@ -172,6 +172,11 @@
 .sl-send svg { width: 16px; height: 16px; }
 .sl-send:disabled { background: transparent; color: #b9b9b9; }
 .sl-send--stop { background: #e01e5a; font-size: 12px; }
+.sl-model { display: inline-flex; border: 1px solid var(--s-border); border-radius: 999px; padding: 2px; margin-right: 8px; }
+.sl-model button { border: 0; background: none; padding: 2px 9px; border-radius: 999px; font: inherit; font-size: 12px;
+  color: var(--s-muted); cursor: pointer; }
+.sl-model button.is-on { background: var(--s-green); color: #fff; }
+.sl-model button:focus-visible { outline: 2px solid #1264a3; outline-offset: 1px; }
 .sl-learn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--s-muted); cursor: pointer; margin-right: 4px; }
 .sl-learn input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .sl-learn__track { width: 28px; height: 16px; border-radius: 999px; background: #c7c7c7; position: relative; transition: background .15s; }
@@ -344,3 +349,7 @@
 /* a note from an instant command (only this person sees it), lined up with the message text */
 .sl-note > .sl-ephemeral__label { margin: 6px 0 -6px; padding-left: 64px; }
 @container (max-width: 760px) { .sl-note > .sl-ephemeral__label { padding-left: 56px; } }
+@media (max-width: 560px) {
+  .sl-composer__foot { flex-wrap: wrap; row-gap: 4px; }
+  .sl-model { order: 99; margin: 0 0 0 auto; }
+}

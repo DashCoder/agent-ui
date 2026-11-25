@@ -24,6 +24,7 @@ interface Props {
 }
 
 const SIDE_KEY = 'agent-ui.sidebar';
+const MODEL_KEY = 'agent-ui.chat-model';
 const EXTRAS = PLUGINS.flatMap((p) => (p.messageExtras ? [{ id: p.id, Extras: p.messageExtras }] : []));
 const GROUP_S = 5 * 60;
 
@@ -40,6 +41,10 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
   const onSink = useCallback((sink: AudioSink | null) => { sinkRef.current = sink; }, []);
   const [saved, setSaved] = useState<SavedReply[]>([]);
   const [learn, setLearn] = useState(config.assistant.learnByDefault);
+  const models = config.chatModels ?? [];
+  const [model, setModelState] = useState<'local' | 'openrouter'>(() => load(MODEL_KEY, 'local'));
+  const pickModel = (m: 'local' | 'openrouter') => { setModelState(m); store(MODEL_KEY, m); };
+  const useModel = models.includes(model) ? model : models[0];
   const [sideOpen, setSideOpen] = useState(() => load(SIDE_KEY, 'open') === 'open');
   const [voiceOn, setVoiceOn] = useState(false);
   const [saveWorkOpen, setSaveWorkOpen] = useState(false);
@@ -104,7 +109,7 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
   };
   const send = (text: string, attachments: string[] = []) => {
     setNotice(null);
-    void chat.send(text, { learn, attachments });
+    void chat.send(text, { learn, attachments, model: useModel });
   };
   const runInstant = async (c: (typeof instant)[number]) => {
     const id = `note-${Date.now()}`;
@@ -271,7 +276,8 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
             )}
           </div>
           <Composer assistantName={name} streaming={chat.streaming} onStop={chat.stop} onSend={send}
-                    commands={commands} learn={learn} onLearn={setLearn} />
+                    commands={commands} learn={learn} onLearn={setLearn}
+                    models={models} model={useModel} onModel={pickModel} />
         </main>
       </div>
     </div>

@@ -81,7 +81,11 @@ export function AvatarPanel({ avatar, talking, onPlayingChange, onSink, compact,
   const hasVideo = avatar.idleVideos.length > 0;
   const hasTalk = avatar.talkVideos.length > 0;
   const talkingSticky = useSticky(talking, 900);
-  const showTalk = playing && talkingSticky && hasTalk;
+  // Clips move by themselves (muted, which browsers allow) unless the admin turned it off or the visitor's device
+  // asks for reduced motion; the play button adds the voice.
+  const reduceMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const moving = playing || (avatar.autoplay !== false && !reduceMotion);
+  const showTalk = moving && talkingSticky && hasTalk;
 
   // Move to a different talking clip after each reply, while it is hidden, so the next one starts cleanly.
   useEffect(() => {
@@ -126,15 +130,15 @@ export function AvatarPanel({ avatar, talking, onPlayingChange, onSink, compact,
       <div className="avatar__circle">
         {hasVideo ? (
           <>
-            <ClipStack clips={avatar.idleVideos} active={idleIdx} playing={playing} visible poster={avatar.posterUrl}
+            <ClipStack clips={avatar.idleVideos} active={idleIdx} playing={moving} visible poster={avatar.posterUrl}
                        onEnded={avatar.idleVideos.length > 1 ? nextIdle : undefined} />
             {hasTalk && (
-              <ClipStack clips={avatar.talkVideos} active={talkIdx} playing={playing && showTalk} visible={showTalk}
+              <ClipStack clips={avatar.talkVideos} active={talkIdx} playing={showTalk} visible={showTalk}
                          className="avatar__talk" />
             )}
           </>
         ) : (
-          <img className={`avatar__media ${playing ? 'avatar__breathe' : ''}`} src={avatar.posterUrl} alt="" />
+          <img className={`avatar__media ${moving ? 'avatar__breathe' : ''}`} src={avatar.posterUrl} alt="" />
         )}
         {live && <SimliStage active={playing} onSink={handleSink} onError={handleLiveError} agent={agent} />}
       </div>

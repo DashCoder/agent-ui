@@ -3,6 +3,8 @@ export interface SiteConfig {
   assistant: { name: string; greeting: string; learnByDefault: boolean };
   avatar: AvatarConfig;
   quickReplies: string[];
+  /** Chat without Hermes: the models the chat box can pick ("local", and "openrouter" when there's a key). */
+  chatModels?: ChatModel[];
   /** Installed agents, with what they suggest for the chat. */
   plugins?: { name: string; version: string; agentName?: string; quickReplies?: string[]; assistantHint?: string;
     /** Ticket keys of these projects (INA-21) become links: url has {key} in it. */
@@ -14,6 +16,8 @@ export interface AvatarConfig {
   idleVideos: string[];
   talkVideos: string[];
   speakReplies: boolean;
+  /** Clips play (muted) as soon as the page opens; the play button adds the voice. Default true. */
+  autoplay?: boolean;
   /** Microsoft Edge neural voice, e.g. en-GB-RyanNeural. */
   voice?: string;
   /** Admin switch and face for the optional live Simli avatar. */
@@ -186,3 +190,5 @@ export interface OptionItem {
 }
 export interface OptionGroup { id: string; title: string; items: OptionItem[] }
 export interface OptionsList { groups: OptionGroup[]; restarting?: boolean }
+
+export type ChatModel = 'local' | 'openrouter';
