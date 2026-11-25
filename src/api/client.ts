@@ -88,6 +88,29 @@ export const api = {
     return request<{ id: string; filename: string; size: number }>('/api/chat/uploads', { method: 'POST', body: form });
   },
 
+  /** Upload a video to become an avatar clip; onProgress gets 0–100 while it uploads, then the server makes the loop. */
+  avatarClip: (file: File, opts: { kind: 'idle' | 'talk'; shape: 'square' | 'wide' | 'tall'; skip: number },
+               onProgress?: (pct: number) => void) =>
+    new Promise<{ url: string; kind: 'idle' | 'talk'; seconds: number; posterUrl: string | null }>((resolve, reject) => {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('kind', opts.kind);
+      form.append('shape', opts.shape);
+      form.append('skip', String(opts.skip));
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', BASE + '/api/admin/avatar/clips');
+      xhr.withCredentials = true;
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100)); };
+      xhr.onload = () => {
+        let body: { detail?: unknown } & Record<string, unknown> = {};
+        try { body = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
+        if (xhr.status >= 200 && xhr.status < 300) resolve(body as never);
+        else reject(new ApiError(xhr.status, typeof body.detail === 'string' ? body.detail : xhr.statusText || 'Upload failed'));
+      };
+      xhr.onerror = () => reject(new ApiError(0, "Couldn't reach the server"));
+      xhr.send(form);
+    }),
+
   // saved replies + save my work
   savedReplies: () => request<{ items: SavedReply[] }>('/api/saved-replies'),
   saveReply: (text: string) => request<SavedReply>('/api/saved-replies', { method: 'POST', body: json({ text }) }),

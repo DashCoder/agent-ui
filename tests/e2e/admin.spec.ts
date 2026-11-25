@@ -150,6 +150,30 @@ test('avatar page lets the admin pick and test a natural voice', async ({ page }
   await expect(page.getByRole('status')).toHaveText('Saved');
 });
 
+test('avatar page: how-to popover and uploading a clip adds it to the list', async ({ page }) => {
+  const state = await mockApi(page, { loggedIn: true });
+  await page.goto('/admin/avatar');
+  await page.getByRole('button', { name: 'ⓘ How to make clips' }).click();
+  const help = page.getByRole('dialog', { name: 'Making avatar clips' });
+  await expect(help).toContainText('With Gemini, from a photo');
+  await expect(help).toContainText('Idle (listening)');
+  await page.keyboard.press('Escape');
+  await expect(help).toBeHidden();
+
+  const upload = page.getByRole('form', { name: 'Upload a clip' });
+  await expect(upload.getByRole('button', { name: 'Upload' })).toBeDisabled();
+  await upload.getByLabel('Video file').setInputFiles({ name: 'veo.mp4', mimeType: 'video/mp4', buffer: Buffer.from('fake') });
+  await upload.getByRole('radio', { name: 'Talking' }).check();
+  await upload.getByRole('button', { name: 'Upload' }).click();
+  await expect(upload.getByRole('status')).toHaveText('Added a 6.9 s talking clip.');
+  await expect(page.getByRole('textbox', { name: 'Talking clips — one URL per line' }))
+    .toHaveValue('/api/avatar/clips/talk_0a1b2c3d.mp4');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  expect(state.settings.avatar.talkVideos).toEqual(['/api/avatar/clips/talk_0a1b2c3d.mp4']);
+  expect(state.settings.avatar.posterUrl).toBe('/api/avatar/clips/poster_0a1b2c3d.jpg');
+});
+
 test('agent logs: conversations open into a transcript; actions per agent', async ({ page }) => {
   await mockApi(page, { loggedIn: true });
   await page.goto('/admin/logs');

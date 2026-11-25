@@ -4,6 +4,7 @@ import { AvatarPanel } from '../../components/AvatarPanel';
 import { useSiteConfig } from '../../hooks/useSiteConfig';
 import { useSpeech } from '../../hooks/useSpeech';
 import { PageHeader } from './AdminLayout';
+import { ClipHelp, ClipUpload } from './AvatarClips';
 import { lines, useSettings } from './useSettings';
 
 /** Microsoft Edge neural voices (free). Any other "xx-XX-NameNeural" voice also works. */
@@ -57,6 +58,8 @@ export function AvatarSettings() {
           <label className="field"><span>Poster image URL</span>
             <input value={form.posterUrl} onChange={(e) => setForm({ ...form, posterUrl: e.target.value })} />
           </label>
+          <div className="clip-help-row"><span className="muted small">Clips are short looping videos of the face.</span>{' '}
+            <ClipHelp /></div>
           <label className="field"><span>Idle (listening) clips — one URL per line</span>
             <textarea rows={3} value={form.idle} onChange={(e) => setForm({ ...form, idle: e.target.value })}
                       placeholder="/avatar/idle_1.mp4" />
@@ -109,10 +112,11 @@ export function AvatarSettings() {
             <span className="muted small">Also needs <code>SIMLI_API_KEY</code> in agent-api's <code>.env</code>.
               Sessions are capped per day (<code>SIMLI_DAILY_SESSIONS</code>) to control cost.</span>
           </fieldset>
-          <p className="muted small">Tip: put clips in <code>public/avatar/</code> or any HTTPS URL. Make them with
-            <code> prepare_clips.py</code> so they loop seamlessly.</p>
+          <p className="muted small">Uploaded clips are added to these lists and saved by themselves: you don't need to
+            type anything. To stop using a clip, delete its line and press Save. You can also list any HTTPS video URL.</p>
           <FormFooter status={status} error={error} />
         </form>
+        <div className="stack">
         <div className="panel">
           <h2 className="panel__title">Preview</h2>
           <AvatarPanel avatar={preview} talking={previewTalking} compact />
@@ -120,6 +124,13 @@ export function AvatarSettings() {
             <input type="checkbox" checked={previewTalking} onChange={(e) => setPreviewTalking(e.target.checked)} />
             Preview talking state (press play first)
           </label>
+        </div>
+        <ClipUpload onAdded={(r) => setForm((f) => {
+          const key = r.kind === 'idle' ? 'idle' : 'talk';
+          const list = lines(f[key]);
+          return { ...f, [key]: (list.includes(r.url) ? list : [...list, r.url]).join('\n'),
+                   posterUrl: r.posterUrl ?? f.posterUrl };
+        })} />
         </div>
       </div>
     </>

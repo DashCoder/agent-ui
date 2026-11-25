@@ -166,6 +166,12 @@ export async function mockApi(page: Page, opts: Partial<MockState> = {}): Promis
       stats: { conversations24h: 2, messages24h: 5, savedReplies: state.saved.length, knowledgeSources: state.knowledge.length },
       agent: { mode: 'mock', reachable: true },
     });
+    if (path === '/api/admin/avatar/clips' && method === 'POST') {
+      const body = req.postData() ?? '';
+      const kind = body.includes('name="kind"\r\n\r\ntalk') ? 'talk' : 'idle';
+      return json(route, { url: `/api/avatar/clips/${kind}_0a1b2c3d.mp4`, kind, seconds: 6.9,
+                           posterUrl: '/api/avatar/clips/poster_0a1b2c3d.jpg' });
+    }
     if (path === '/api/admin/settings' && method === 'GET') return json(route, state.settings);
     if (path === '/api/admin/settings' && method === 'PUT') {
       for (const [k, v] of Object.entries(body)) state.settings[k] = typeof v === 'object' && !Array.isArray(v) ? { ...state.settings[k], ...v as object } : v;
