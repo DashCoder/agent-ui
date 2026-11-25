@@ -8,7 +8,8 @@ import type {
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  /** e.g. "sign_in" (chat needs a signed-in, trusted person) or "not_trusted" */
+  constructor(public status: number, message: string, public code?: string) {
     super(message);
   }
 }
@@ -66,7 +67,16 @@ export const api = {
       headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
       body: json(body),
     });
-    if (!res.ok || !res.body) throw new ApiError(res.status, `Chat failed (${res.status})`);
+    if (!res.ok || !res.body) {
+      let message = `Chat failed (${res.status})`;
+      let code: string | undefined;
+      try {
+        const detail = (await res.json()).detail;
+        if (typeof detail === 'string') message = detail;
+        else if (detail?.message) { message = detail.message; code = detail.code; }
+      } catch { /* keep the generic message */ }
+      throw new ApiError(res.status, message, code);
+    }
     await readEventStream(res.body, onEvent);
   },
   approve: (approval: Approval, approve: boolean, sessionId: string) =>

@@ -21,6 +21,8 @@ export interface ChatState {
   progress: string | null;
   approval: Approval | null;
   error: string | null;
+  /** The server said this browser has to sign in (or use a trusted email) to chat. */
+  needsSignIn: boolean;
   send: (text: string, opts: { learn: boolean; attachments?: string[] }) => Promise<void>;
   answerApproval: (approve: boolean) => Promise<void>;
   stop: () => void;
@@ -41,6 +43,7 @@ export function useChat(ready = true, agent?: string): ChatState {
   const [progress, setProgress] = useState<string | null>(null);
   const [approval, setApproval] = useState<Approval | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const startNew = useCallback(async () => {
@@ -80,6 +83,7 @@ export function useChat(ready = true, agent?: string): ChatState {
     const trimmed = text.trim();
     if (!trimmed || streaming) return;
     setError(null);
+    setNeedsSignIn(false);
     setApproval(null);
     setStreaming(true);
     setDraft('');
@@ -117,8 +121,14 @@ export function useChat(ready = true, agent?: string): ChatState {
         }
       }, controller.signal);
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') setError((e as Error).message);
-      else if (acc) {
+      if ((e as Error).name !== 'AbortError') {
+        setError((e as Error).message);
+        const code = (e as { code?: string }).code;
+        if (code === 'sign_in' || code === 'not_trusted') {
+          setNeedsSignIn(true);
+          setMessages((m) => m.filter((x) => x.id !== optimistic.id));
+        }
+      } else if (acc) {
         setMessages((m) => [...m, { id: `local-${Date.now()}`, role: 'assistant', text: acc, created_at: Date.now() / 1000 }]);
       }
     } finally {
@@ -157,5 +167,5 @@ export function useChat(ready = true, agent?: string): ChatState {
     } catch (e) { setError((e as Error).message); }
   }, [sessionId]);
 
-  return { messages, draft, streaming, progress, approval, error, send, answerApproval, stop, reset, remove };
+  return { messages, draft, streaming, progress, approval, error, needsSignIn, send, answerApproval, stop, reset, remove };
 }

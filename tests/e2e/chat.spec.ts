@@ -360,3 +360,27 @@ test('Jira ticket keys link to Jira, however the agent writes them', async ({ pa
   expect(cases).toEqual(['([INA-7](https://j/browse/INA-7)) and [INA-8](https://j/browse/INA-8).',
     '[INA-9](https://j/browse/INA-9)', 'MINA-3 INA-3x', 'INA-1']);
 });
+
+test('when the agents need a signed-in person, the chat offers sign-in by email code or the admin', async ({ page }) => {
+  await mockApi(page);
+  let signed = false;
+  await page.route((u) => u.pathname.endsWith('/stream'), (route) => signed ? route.fallback()
+    : route.fulfill({ status: 401, json: { detail: { code: 'sign_in', message: 'Please sign in to chat with the agents.' } } }));
+  await page.route('**/api/save-work/**', (route) => {
+    if (route.request().url().endsWith('/start')) return route.fulfill({ json: { sent: true } });
+    signed = true;
+    return route.fulfill({ json: { email: 'axel@inagentic.ai' } });
+  });
+  await page.goto('/');
+  await page.getByRole('textbox').first().fill('What are your rates?');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('alert')).toContainText('Please sign in to chat with the agents.');
+  const box = page.getByTestId('chat-sign-in');
+  await expect(box.getByRole('link', { name: 'sign in to the admin' })).toHaveAttribute('href', '/login');
+  await box.getByRole('textbox').fill('axel@inagentic.ai');
+  await box.locator('button[type=submit]').click();
+  await box.getByRole('textbox').fill('123456');
+  await box.locator('button[type=submit]').click();
+  await expect(page.getByRole('status')).toContainText('Signed in as axel@inagentic.ai. Send your message again.');
+  await expect(page.getByTestId('chat-sign-in')).toHaveCount(0);
+});

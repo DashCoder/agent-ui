@@ -43,6 +43,8 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
   const [sideOpen, setSideOpen] = useState(() => load(SIDE_KEY, 'open') === 'open');
   const [voiceOn, setVoiceOn] = useState(false);
   const [saveWorkOpen, setSaveWorkOpen] = useState(false);
+  const [signInHidden, setSignInHidden] = useState(false);
+  useEffect(() => { if (chat.needsSignIn) setSignInHidden(false); }, [chat.needsSignIn]);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   // answers from instant commands (e.g. "Build status"): shown after the message that was last when they ran
@@ -251,6 +253,15 @@ export function ChatExperience({ savedPlacement = 'aside', agent }: Props) {
             )}
             {notice && <p className="sl-notice" role="status">{notice}</p>}
             {chat.error && <p className="chat-error" role="alert">{chat.error}</p>}
+            {chat.needsSignIn && !signInHidden && !saveWorkOpen && (
+              <div className="sl-ephemeral" data-testid="chat-sign-in">
+                <p className="sl-ephemeral__label">Only visible to you</p>
+                <p style={{ marginTop: 0 }}>Sign in with your email (we send you a code), or{' '}
+                  <Link to="/login">sign in to the admin</Link>.</p>
+                <SaveWorkForm onCancel={() => setSignInHidden(true)}
+                              onDone={(email) => { setSignInHidden(true); setNotice(`Signed in as ${email}. Send your message again.`); }} />
+              </div>
+            )}
           </div>
 
           <div className="sl-typing" aria-live="polite">
